@@ -62,6 +62,7 @@ export const TEAM_EMAILS: Record<string, { name: string; role: string }> = {
   'angelguerrero1999@gmail.com': { name: 'Angel', role: 'admin' },
   'viralvisionmk@gmail.com': { name: 'Santiago', role: 'admin' },
   'jeninalopezz@gmail.com': { name: 'Jenina', role: 'admin' },
+  'hello@jenlopez.site': { name: 'Jenina', role: 'admin' },
   'storres1524@gmail.com': { name: 'Sergio', role: 'editor' },
   'jrbp.contato@gmail.com': { name: 'Rodrigo', role: 'editor' },
   'alex10soccer2@gmail.com': { name: 'Alex', role: 'editor' },

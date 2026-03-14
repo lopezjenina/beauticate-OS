@@ -91,9 +91,10 @@ export default function ChatPage() {
     setSending(true);
     setInput('');
 
-    // Optimistic insert
+    // Optimistic insert with temp id
+    const tempId = `temp_${Date.now()}`;
     const optimistic: Message = {
-      id: crypto.randomUUID(),
+      id: tempId,
       user_id: user.id,
       user_name: user.name || user.email || 'You',
       user_avatar: user.avatar || null,
@@ -103,18 +104,19 @@ export default function ChatPage() {
     setMessages(prev => [...prev, optimistic]);
     setTimeout(() => scrollToBottom(true), 50);
 
-    const { error } = await supabase.from('messages').insert({
-      user_id: user.id,
-      user_name: user.name || user.email || 'Unknown',
-      user_avatar: user.avatar || null,
-      content,
-    });
+    const { data: saved, error } = await supabase
+      .from('messages')
+      .insert({ user_id: user.id, user_name: user.name || user.email || 'Unknown', user_avatar: user.avatar || null, content })
+      .select()
+      .single();
 
     if (error) {
       console.error('Chat error:', error.message);
-      // Remove optimistic message on failure
-      setMessages(prev => prev.filter(m => m.id !== optimistic.id));
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       setInput(content);
+    } else if (saved) {
+      // Replace temp message with real one — realtime event dedup will now match the real id
+      setMessages(prev => prev.map(m => m.id === tempId ? saved as Message : m));
     }
 
     setSending(false);

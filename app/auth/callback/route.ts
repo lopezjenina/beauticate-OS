@@ -1,6 +1,9 @@
-import { createServerSupabase } from '@/lib/supabase/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { TEAM_EMAILS } from '@/lib/constants';
 import { NextResponse } from 'next/server';
+
+type CookieEntry = { name: string; value: string; options: CookieOptions };
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -8,11 +11,34 @@ export async function GET(request: Request) {
   const next = searchParams.get('next') ?? '/dashboard';
 
   if (code) {
-    const supabase = await createServerSupabase();
+    const cookieStore = await cookies();
+
+    // Collect cookies that Supabase wants to set so we can attach them to the redirect
+    const cookiesToSet: CookieEntry[] = [];
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(incoming: CookieEntry[]) {
+            // Store for manual attachment to redirect response
+            cookiesToSet.push(...incoming);
+            // Also set on cookieStore (for any server-side reads within this request)
+            incoming.forEach(({ name, value, options }) => {
+              try { cookieStore.set(name, value, options as any); } catch { /* ignore */ }
+            });
+          },
+        },
+      }
+    );
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.user) {
-      // Check if profile exists, create if not
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -24,7 +50,6 @@ export async function GET(request: Request) {
         const meta = data.user.user_metadata || {};
         const teamInfo = TEAM_EMAILS[email.toLowerCase()];
 
-        // Priority: invite metadata > TEAM_EMAILS allowlist > viewer default
         const name = meta.name || teamInfo?.name || meta.full_name || email.split('@')[0];
         const role = meta.role || teamInfo?.role || 'viewer';
 
@@ -44,7 +69,12 @@ export async function GET(request: Request) {
           .eq('id', data.user.id);
       }
 
-      return NextResponse.redirect(`${origin}${next}`);
+      // Build redirect and explicitly attach session cookies
+      const redirectResponse = NextResponse.redirect(`${origin}${next}`);
+      cookiesToSet.forEach(({ name, value, options }) => {
+        redirectResponse.cookies.set(name, value, options);
+      });
+      return redirectResponse;
     }
   }
 

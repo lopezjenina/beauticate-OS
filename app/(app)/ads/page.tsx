@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, SearchInput } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid } from '@/components/ui/shared';
+import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatPeso, formatPesoK, formatDate, pct } from '@/lib/utils';
 import { AD_STATUSES, PLATFORMS } from '@/lib/constants';
 import type { AdCampaign } from '@/types';
@@ -48,62 +49,78 @@ export default function AdsPage() {
   return (
     <div>
       <PageHeader title="Ads" subtitle="Campaign tracker — budget, spend & optimization dates.">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search..." />
-        <div style={{ display: 'flex', border: '1px solid var(--brd)', borderRadius: 8, overflow: 'hidden' }}>
-          {(['cards', 'list'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: '7px 14px', background: view === v ? 'rgba(127,119,221,.15)' : 'transparent', color: view === v ? '#7F77DD' : 'var(--mut)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{v === 'cards' ? 'Cards' : 'List'}</button>
-          ))}
-        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search campaigns..." />
+        <ViewToggle options={[{ key: 'cards', label: 'Cards' }, { key: 'list', label: 'List' }]} value={view} onChange={v => setView(v as 'cards' | 'list')} />
         {role.canEdit && <PrimaryButton onClick={openNew}>+ New campaign</PrimaryButton>}
       </PageHeader>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <MetricCard label="Active" value={active.length} accent="#639922" />
-        <MetricCard label="Budget" value={formatPesoK(totalBudget)} accent="#7F77DD" />
-        <MetricCard label="Spent" value={formatPesoK(totalSpent)} accent="#EF9F27" />
-        <MetricCard label="Utilization" value={totalBudget > 0 ? pct(totalSpent, totalBudget) + '%' : '—'} accent="#378ADD" />
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+        <MetricCard label="Active" value={active.length} accent="#4ade80" />
+        <MetricCard label="Total budget" value={formatPesoK(totalBudget)} />
+        <MetricCard label="Total spent" value={formatPesoK(totalSpent)} />
+        <MetricCard label="Utilization" value={totalBudget > 0 ? pct(totalSpent, totalBudget) + '%' : '—'} />
       </div>
 
       {view === 'cards' ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
           {filtered.map(item => {
             const st = AD_STATUSES.find(s => s.key === item.status);
+            const over = item.spent > item.budget;
             return (
-              <div key={item.id} onClick={() => openEdit(item)} style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, padding: '14px 16px', cursor: 'pointer', borderLeft: `3px solid ${st?.color || '#888'}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700 }}>{item.campaign_name}</span>
+              <div
+                key={item.id} onClick={() => openEdit(item)}
+                style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, padding: '16px', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{item.campaign_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--mut)' }}>{item.client_name}{item.platform ? ` · ${item.platform}` : ''}</div>
+                  </div>
                   <Badge color={st?.color || '#888'}>{st?.label}</Badge>
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
-                  {item.client_name}{item.platform && ` · ${item.platform}`}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 8 }}>
+                  <span style={{ color: 'var(--mut)' }}>Budget <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{formatPeso(item.budget)}</span></span>
+                  <span style={{ color: 'var(--mut)' }}>Spent <span style={{ color: over ? '#f87171' : 'var(--fg)', fontWeight: 600 }}>{formatPeso(item.spent)}</span></span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-                  <span style={{ color: 'var(--mut)' }}>Budget: <strong style={{ color: 'var(--fg)' }}>{formatPeso(item.budget)}</strong></span>
-                  <span style={{ color: 'var(--mut)' }}>Spent: <strong style={{ color: item.spent > item.budget ? '#E24B4A' : '#EF9F27' }}>{formatPeso(item.spent)}</strong></span>
-                </div>
-                <ProgressBar value={item.spent} max={item.budget} color={item.spent > item.budget * 0.9 ? '#E24B4A' : '#639922'} h={5} />
-                {item.next_optimization && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 6 }}>Next optimization: {formatDate(item.next_optimization)}</div>}
+                <ProgressBar value={item.spent} max={item.budget} color={over ? '#f87171' : '#7F77DD'} h={4} />
+                {item.next_optimization && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 8 }}>Next optimization: {formatDate(item.next_optimization)}</div>}
               </div>
             );
           })}
+          {!loading && filtered.length === 0 && <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--mut)', fontSize: 13 }}>No campaigns found.</div>}
         </div>
       ) : (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--brd)', overflow: 'hidden' }}>
-          <table><thead><tr>{['Campaign', 'Client', 'Platform', 'Status', 'Budget', 'Spent', ''].map(h => <th key={h}>{h}</th>)}</tr></thead>
-          <tbody>{filtered.map(item => { const st = AD_STATUSES.find(s => s.key === item.status); return (
-            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
-              <td style={{ fontWeight: 600 }}>{item.campaign_name}</td>
-              <td style={{ color: 'var(--mut)' }}>{item.client_name}</td>
-              <td><Badge color="#7F77DD">{item.platform || '—'}</Badge></td>
-              <td><Badge color={st?.color || '#888'}>{st?.label}</Badge></td>
-              <td style={{ fontWeight: 600 }}>{formatPeso(item.budget)}</td>
-              <td style={{ fontWeight: 600, color: item.spent > item.budget ? '#E24B4A' : 'var(--fg)' }}>{formatPeso(item.spent)}</td>
-              <td>{role.canDelete && <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer' }}>✕</button>}</td>
-            </tr>); })}</tbody></table>
+        <div style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+          <table>
+            <thead>
+              <tr>{['Campaign', 'Client', 'Platform', 'Status', 'Budget', 'Spent', 'Utilization', ''].map(h => <th key={h}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {filtered.map(item => {
+                const st = AD_STATUSES.find(s => s.key === item.status);
+                const over = item.spent > item.budget;
+                return (
+                  <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
+                    <td style={{ fontWeight: 600 }}>{item.campaign_name}</td>
+                    <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.client_name}</td>
+                    <td>{item.platform ? <Badge color="#7F77DD">{item.platform}</Badge> : <span style={{ color: 'var(--mut)' }}>—</span>}</td>
+                    <td><Badge color={st?.color || '#888'}>{st?.label}</Badge></td>
+                    <td style={{ fontWeight: 600 }}>{formatPeso(item.budget)}</td>
+                    <td style={{ fontWeight: 600, color: over ? '#f87171' : 'var(--fg)' }}>{formatPeso(item.spent)}</td>
+                    <td style={{ fontSize: 12, color: 'var(--mut)' }}>{item.budget > 0 ? pct(item.spent, item.budget) + '%' : '—'}</td>
+                    <td>
+                      {role.canDelete && (
+                        <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)', fontSize: 13 }}>No campaigns found.</div>}
         </div>
       )}
-
-      {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)' }}>No campaigns found.</div>}
 
       <Modal open={!!modal} onClose={() => { setModal(null); setEditItem(null); }} title={modal === 'edit' ? 'Edit campaign' : 'New campaign'}>
         <FormGrid>
@@ -111,8 +128,8 @@ export default function AdsPage() {
           <FormRow label="Client" required><input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} /></FormRow>
           <FormRow label="Platform"><select value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}><option value="">Select...</option>{PLATFORMS.map(p => <option key={p}>{p}</option>)}</select></FormRow>
           <FormRow label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{AD_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></FormRow>
-          <FormRow label="Budget (₱)"><input type="number" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} /></FormRow>
-          <FormRow label="Spent (₱)"><input type="number" value={form.spent} onChange={e => setForm({ ...form, spent: e.target.value })} /></FormRow>
+          <FormRow label="Budget ($)"><input type="number" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} /></FormRow>
+          <FormRow label="Spent ($)"><input type="number" value={form.spent} onChange={e => setForm({ ...form, spent: e.target.value })} /></FormRow>
           <FormRow label="Start date"><input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} /></FormRow>
           <FormRow label="Next optimization"><input type="date" value={form.next_optimization} onChange={e => setForm({ ...form, next_optimization: e.target.value })} /></FormRow>
         </FormGrid>
@@ -122,7 +139,7 @@ export default function AdsPage() {
           <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
-            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save' : 'Add campaign'}</PrimaryButton>}
+            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add campaign'}</PrimaryButton>}
           </div>
         </div>
       </Modal>

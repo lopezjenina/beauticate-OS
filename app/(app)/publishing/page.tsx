@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, SearchInput } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader } from '@/components/ui/shared';
+import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { PUBLISH_STATUSES, PLATFORMS } from '@/lib/constants';
+import { WEEKS } from '@/lib/utils';
 import type { PublishItem } from '@/types';
 
 const emptyForm = { client_name: '', title: '', caption: '', scheduled_date: '', platform: '', status: 'pending_caption', week_num: '1' };
@@ -14,16 +16,15 @@ export default function PublishingPage() {
   const { data: items, loading, refetch } = useTable<PublishItem>('publishing', 'created_at');
   const { user, role } = useAuth();
   const [search, setSearch] = useState('');
-  const [view, setView] = useState<'board' | 'list'>('board');
+  const [view, setView] = useState<'weekly' | 'board'>('weekly');
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
   const [editItem, setEditItem] = useState<PublishItem | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
   const filtered = items.filter(i => !search || i.client_name.toLowerCase().includes(search.toLowerCase()) || i.title.toLowerCase().includes(search.toLowerCase()));
-  const pending = filtered.filter(i => i.status === 'pending_caption').length;
-  const scheduled = filtered.filter(i => i.status === 'scheduled').length;
-  const posted = filtered.filter(i => i.status === 'posted').length;
 
   const openNew = () => { setForm(emptyForm); setEditItem(null); setModal('new'); };
   const openEdit = (item: PublishItem) => {
@@ -49,44 +50,120 @@ export default function PublishingPage() {
   const handleDrop = async (statusKey: string) => {
     if (!dragId) return;
     await update('publishing', dragId, { status: statusKey });
-    await log('Content status changed', statusKey, 'publishing', 'info', user?.name || 'System');
-    setDragId(null); refetch();
+    setDragId(null); setDragOver(null); refetch();
   };
+
+  const statusMap = Object.fromEntries(PUBLISH_STATUSES.map(s => [s.key, s]));
 
   return (
     <div>
-      <PageHeader title="Publishing" subtitle="Content calendar — drag cards to update status.">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search..." />
-        <div style={{ display: 'flex', border: '1px solid var(--brd)', borderRadius: 8, overflow: 'hidden' }}>
-          {(['board', 'list'] as const).map(v => (
-            <button key={v} onClick={() => setView(v)} style={{ padding: '7px 14px', background: view === v ? 'rgba(127,119,221,.15)' : 'transparent', color: view === v ? '#7F77DD' : 'var(--mut)', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>{v === 'board' ? 'Board' : 'List'}</button>
-          ))}
-        </div>
+      <PageHeader title="Publishing" subtitle="Content calendar grouped by delivery week.">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search content..." />
+        <ViewToggle options={[{ key: 'weekly', label: 'Weekly' }, { key: 'board', label: 'Board' }]} value={view} onChange={v => setView(v as 'weekly' | 'board')} />
         {role.canEdit && <PrimaryButton onClick={openNew}>+ New content</PrimaryButton>}
       </PageHeader>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <MetricCard label="Pending" value={pending} accent="#E24B4A" />
-        <MetricCard label="Scheduled" value={scheduled} accent="#378ADD" />
-        <MetricCard label="Posted" value={posted} accent="#639922" />
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+        {PUBLISH_STATUSES.map(s => (
+          <MetricCard key={s.key} label={s.label} value={filtered.filter(i => i.status === s.key).length} accent={s.color} />
+        ))}
       </div>
 
-      {view === 'board' ? (
+      {view === 'weekly' ? (
+        <>
+          {WEEKS.map(w => {
+            const weekItems = filtered.filter(i => i.week_num === w.num);
+            const isCollapsed = collapsed[w.num] ?? false;
+            return (
+              <div key={w.num} style={{ marginBottom: 6 }}>
+                <WeekHeader
+                  weekNum={w.num} label={w.label} dateRange={w.dateRange}
+                  count={weekItems.length} vTarget={0} vComplete={0}
+                  collapsed={isCollapsed}
+                  onToggle={() => setCollapsed(p => ({ ...p, [w.num]: !isCollapsed }))}
+                />
+                {!isCollapsed && weekItems.length > 0 && (
+                  <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th style={{ width: '28%' }}>Title</th>
+                          <th style={{ width: '16%' }}>Client</th>
+                          <th style={{ width: '13%' }}>Platform</th>
+                          <th style={{ width: '14%' }}>Status</th>
+                          <th style={{ width: '12%' }}>Scheduled</th>
+                          <th style={{ width: '17%' }}>Caption</th>
+                          <th style={{ width: '5%' }} />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weekItems.map(item => {
+                          const st = statusMap[item.status];
+                          return (
+                            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
+                              <td style={{ fontWeight: 600 }}>{item.title}</td>
+                              <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.client_name}</td>
+                              <td>{item.platform ? <Badge color="#7F77DD">{item.platform}</Badge> : <span style={{ color: 'var(--mut)', fontSize: 12 }}>—</span>}</td>
+                              <td><Badge color={st?.color || '#888'}>{st?.label}</Badge></td>
+                              <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.scheduled_date ? formatDate(item.scheduled_date) : '—'}</td>
+                              <td style={{ fontSize: 11, color: 'var(--mut)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.caption || '—'}</td>
+                              <td>
+                                {role.canDelete && (
+                                  <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {!isCollapsed && weekItems.length === 0 && (
+                  <div style={{ padding: '12px 16px', color: 'var(--mut)', fontSize: 13, marginBottom: 10 }}>No content this week.</div>
+                )}
+              </div>
+            );
+          })}
+          {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)' }}>No content found.</div>}
+        </>
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PUBLISH_STATUSES.length}, minmax(0,1fr))`, gap: 8 }}>
           {PUBLISH_STATUSES.map(status => {
             const colItems = filtered.filter(i => i.status === status.key);
+            const isOver = dragOver === status.key;
             return (
-              <div key={status.key} onDragOver={e => e.preventDefault()} onDrop={() => handleDrop(status.key)} style={{ background: 'var(--bg-2)', borderRadius: 12, padding: 10, minHeight: 200, border: '1px solid var(--brd)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, padding: '0 4px' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: status.color }}>{status.label}</span>
-                  <span style={{ fontSize: 11, background: status.color + '1A', color: status.color, padding: '2px 8px', borderRadius: 10, fontWeight: 600 }}>{colItems.length}</span>
+              <div
+                key={status.key}
+                className={`kanban-col${isOver ? ' drag-over' : ''}`}
+                onDragOver={e => { e.preventDefault(); setDragOver(status.key); }}
+                onDragLeave={() => setDragOver(null)}
+                onDrop={() => handleDrop(status.key)}
+                style={{ background: 'var(--bg-2)', borderRadius: 10, padding: '10px 8px', minHeight: 200, border: '1px solid var(--brd)' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, padding: '0 4px' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: status.color }}>{status.label}</span>
+                  <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)', color: 'var(--mut)', padding: '2px 7px', borderRadius: 20, fontWeight: 600 }}>{colItems.length}</span>
                 </div>
                 {colItems.map(item => (
-                  <div key={item.id} draggable={role.canEdit} onDragStart={() => setDragId(item.id)} onDragEnd={() => setDragId(null)} onClick={() => openEdit(item)}
-                    style={{ background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 8, padding: '10px 12px', marginBottom: 6, cursor: role.canEdit ? 'grab' : 'pointer', borderLeft: `3px solid ${status.color}` }}>
+                  <div
+                    key={item.id}
+                    draggable={role.canEdit}
+                    onDragStart={() => setDragId(item.id)}
+                    onDragEnd={() => { setDragId(null); setDragOver(null); }}
+                    onClick={() => openEdit(item)}
+                    style={{
+                      background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 8,
+                      padding: '10px 12px', marginBottom: 6,
+                      cursor: role.canEdit ? 'grab' : 'pointer',
+                      opacity: dragId === item.id ? 0.45 : 1,
+                      transition: 'opacity 0.15s',
+                      borderLeft: `2px solid ${status.color}`,
+                    }}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--mut)' }}>{item.client_name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--mut)', marginBottom: 6 }}>{item.client_name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       {item.platform && <Badge color="#7F77DD">{item.platform}</Badge>}
                       {item.scheduled_date && <span style={{ fontSize: 10, color: 'var(--mut)' }}>{formatDate(item.scheduled_date)}</span>}
                     </div>
@@ -96,38 +173,23 @@ export default function PublishingPage() {
             );
           })}
         </div>
-      ) : (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--brd)', overflow: 'hidden' }}>
-          <table><thead><tr>{['Title', 'Client', 'Platform', 'Status', 'Scheduled', ''].map(h => <th key={h}>{h}</th>)}</tr></thead>
-          <tbody>{filtered.map(item => { const st = PUBLISH_STATUSES.find(s => s.key === item.status); return (
-            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
-              <td style={{ fontWeight: 600 }}>{item.title}</td>
-              <td style={{ color: 'var(--mut)' }}>{item.client_name}</td>
-              <td><Badge color="#7F77DD">{item.platform || '—'}</Badge></td>
-              <td><Badge color={st?.color || '#888'}>{st?.label}</Badge></td>
-              <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.scheduled_date ? formatDate(item.scheduled_date) : '—'}</td>
-              <td>{role.canDelete && <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer' }}>✕</button>}</td>
-            </tr>); })}</tbody></table>
-        </div>
       )}
 
-      {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)' }}>No content found.</div>}
-
-      <Modal open={!!modal} onClose={() => { setModal(null); setEditItem(null); }} title={modal === 'edit' ? 'Edit content' : 'New content'}>
+      <Modal open={!!modal} onClose={() => { setModal(null); setEditItem(null); }} title={modal === 'edit' ? 'Edit content' : 'New content'} width={560}>
         <FormGrid>
           <FormRow label="Client" required><input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} /></FormRow>
           <FormRow label="Title" required><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></FormRow>
           <FormRow label="Platform"><select value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}><option value="">Select...</option>{PLATFORMS.map(p => <option key={p}>{p}</option>)}</select></FormRow>
           <FormRow label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{PUBLISH_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></FormRow>
-          <FormRow label="Scheduled"><input type="date" value={form.scheduled_date} onChange={e => setForm({ ...form, scheduled_date: e.target.value })} /></FormRow>
+          <FormRow label="Scheduled date"><input type="date" value={form.scheduled_date} onChange={e => setForm({ ...form, scheduled_date: e.target.value })} /></FormRow>
           <FormRow label="Week"><select value={form.week_num} onChange={e => setForm({ ...form, week_num: e.target.value })}>{[1,2,3,4].map(w => <option key={w} value={w}>Week {w}</option>)}</select></FormRow>
         </FormGrid>
-        <FormRow label="Caption"><textarea value={form.caption} onChange={e => setForm({ ...form, caption: e.target.value })} rows={4} /></FormRow>
+        <FormRow label="Caption"><textarea value={form.caption} onChange={e => setForm({ ...form, caption: e.target.value })} rows={3} /></FormRow>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
           <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
-            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save' : 'Add content'}</PrimaryButton>}
+            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add content'}</PrimaryButton>}
           </div>
         </div>
       </Modal>

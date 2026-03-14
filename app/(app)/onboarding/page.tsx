@@ -15,6 +15,8 @@ const CHECKLIST = [
   { key: 'shoot_scheduled', label: 'Shoot scheduled' },
 ] as const;
 
+type ChecklistKey = typeof CHECKLIST[number]['key'];
+
 const empty = { client_name: '', editor_assigned: '', social_assigned: '', videographer: '', package_type: '', shoot_date: '', notes: '', contract_signed: false, invoice_paid: false, strategy_called: false, shoot_scheduled: false };
 
 export default function OnboardingPage() {
@@ -55,13 +57,12 @@ export default function OnboardingPage() {
     setModal(null); setEditItem(null); refetch();
   };
 
-  const toggleCheck = async (item: OnboardingItem, key: string) => {
+  const toggleCheck = async (item: OnboardingItem, key: ChecklistKey) => {
     if (!role.canEdit) return;
-    const val = !(item as any)[key];
-    const updates: any = { [key]: val };
-    const newCount = (key === 'contract_signed' ? (val ? 1 : 0) : item.contract_signed ? 1 : 0) + (key === 'invoice_paid' ? (val ? 1 : 0) : item.invoice_paid ? 1 : 0) + (key === 'strategy_called' ? (val ? 1 : 0) : item.strategy_called ? 1 : 0) + (key === 'shoot_scheduled' ? (val ? 1 : 0) : item.shoot_scheduled ? 1 : 0);
-    updates.status = newCount === 4 ? 'complete' : 'in_progress';
-    await update('onboarding', item.id, updates);
+    const val = !item[key];
+    const updated = { ...item, [key]: val };
+    const newCount = (updated.contract_signed ? 1 : 0) + (updated.invoice_paid ? 1 : 0) + (updated.strategy_called ? 1 : 0) + (updated.shoot_scheduled ? 1 : 0);
+    await update('onboarding', item.id, { [key]: val, status: newCount === 4 ? 'complete' : 'in_progress' });
     refetch();
   };
 
@@ -95,8 +96,8 @@ export default function OnboardingPage() {
               <ProgressBar value={done} max={4} color={done === 4 ? '#639922' : '#EF9F27'} h={6} />
               <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                 {CHECKLIST.map(c => (
-                  <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: (item as any)[c.key] ? '#639922' : 'var(--mut)', cursor: role.canEdit ? 'pointer' : 'default' }}>
-                    <input type="checkbox" checked={(item as any)[c.key]} onChange={() => toggleCheck(item, c.key)} disabled={!role.canEdit} style={{ accentColor: '#639922' }} />
+                  <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: item[c.key] ? '#639922' : 'var(--mut)', cursor: role.canEdit ? 'pointer' : 'default' }}>
+                    <input type="checkbox" checked={item[c.key]} onChange={() => toggleCheck(item, c.key)} disabled={!role.canEdit} style={{ accentColor: '#639922' }} />
                     {c.label}
                   </label>
                 ))}
@@ -120,7 +121,7 @@ export default function OnboardingPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '12px 0' }}>
           {CHECKLIST.map(c => (
             <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              <input type="checkbox" checked={(form as any)[c.key]} onChange={e => setForm({ ...form, [c.key]: e.target.checked })} style={{ accentColor: '#639922' }} />
+              <input type="checkbox" checked={form[c.key]} onChange={e => setForm({ ...form, [c.key]: e.target.checked })} style={{ accentColor: '#639922' }} />
               {c.label}
             </label>
           ))}

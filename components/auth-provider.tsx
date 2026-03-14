@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ROLES } from '@/lib/constants';
 import type { RoleConfig } from '@/types';
@@ -42,7 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<RoleConfig>(defaultRole);
   const [loading, setLoading] = useState(true);
 
-  const supabase = createClient();
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
   useEffect(() => {
     let mounted = true;
@@ -84,13 +85,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       listener?.subscription?.unsubscribe?.();
     };
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signOut = useMemo(() => async () => {
     await supabase.auth.signOut();
     setUser(null);
     setRole(defaultRole);
-  }, [supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signInWithGoogle = useMemo(() => async () => {
     await supabase.auth.signInWithOAuth({

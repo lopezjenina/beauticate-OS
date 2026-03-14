@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Sale } from '@/types';
+import type { Sale, LogType } from '@/types';
 
 const supabase = createClient();
 
@@ -47,7 +47,7 @@ export async function remove(table: string, id: string) {
   if (error) throw error;
 }
 
-export async function log(action: string, detail = '', board = '', type = 'info', user = 'System') {
+export async function log(action: string, detail = '', board = '', type: LogType = 'info', user = 'System') {
   await supabase.from('activity_log').insert({ action, detail, board, log_type: type, user_name: user });
 }
 
@@ -79,7 +79,7 @@ export function useProfile() {
 }
 
 export function useActivityLog() {
-  const addLog = useCallback(async (action: string, detail = '', board = '', type = 'info', user = 'System') => {
+  const addLog = useCallback(async (action: string, detail = '', board = '', type: LogType = 'info', user = 'System') => {
     await log(action, detail, board, type, user);
   }, []);
 

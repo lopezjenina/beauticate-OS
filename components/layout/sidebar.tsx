@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useProfile, useActivityLog } from '@/lib/hooks';
@@ -33,6 +33,10 @@ export function Sidebar() {
     router.push('/login');
   };
 
+  useEffect(() => {
+    if (!loading && !profile) router.push('/login');
+  }, [loading, profile, router]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-0)' }}>
@@ -44,10 +48,7 @@ export function Sidebar() {
     );
   }
 
-  if (!profile) {
-    router.push('/login');
-    return null;
-  }
+  if (!profile) return null;
 
   const visibleNav = NAV_ITEMS.filter(n => role.boards.includes(n.key));
 

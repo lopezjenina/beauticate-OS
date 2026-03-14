@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader, ProgressBar } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader, ProgressBar, PageLoader } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { formatDate, statusColor, WEEKS } from '@/lib/utils';
 import { EDITORS, VIDEOGRAPHERS, PACKAGES } from '@/lib/constants';
@@ -22,7 +22,7 @@ type StageKey = typeof STAGES[number]['key'];
 const emptyForm = { name: '', editor: '', videographer: '', week_num: '1', videos_target: '4', videos_complete: '0', shoot_date: '', next_shoot: '', status: 'on_track', package_type: '', notes: '', stage_shoot: '0', stage_edit: '0', stage_approval: '0', stage_sent_guido: '0', stage_posted: '0' };
 
 export default function ProductionPage() {
-  const { data: clients, refetch } = useTable<Client>('clients', 'created_at');
+  const { data: clients, loading, refetch } = useTable<Client>('clients', 'created_at');
   const { user, role } = useAuth();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
@@ -61,6 +61,8 @@ export default function ProductionPage() {
     await update('clients', client.id, { [key]: val });
     refetch();
   };
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

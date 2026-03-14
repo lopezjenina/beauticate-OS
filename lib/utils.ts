@@ -5,11 +5,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatPeso(value: number): string {
-  return `₱${Number(value || 0).toLocaleString()}`;
+  return `$${Number(value || 0).toLocaleString()}`;
 }
 
 export function formatPesoK(value: number): string {
-  return `₱${(Number(value || 0) / 1000).toFixed(0)}k`;
+  return `$${(Number(value || 0) / 1000).toFixed(0)}k`;
 }
 
 export function formatDate(date: string | null): string {

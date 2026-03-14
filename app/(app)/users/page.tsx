@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTable, update, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow, PageLoader } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { ROLES } from '@/lib/constants';
 import type { Profile } from '@/types';
@@ -20,7 +20,7 @@ function timeAgo(iso: string) {
 const ROLE_OPTIONS = Object.entries(ROLES).map(([key, cfg]) => ({ key, label: cfg.label, color: cfg.color }));
 
 export default function UsersPage() {
-  const { data: profiles, refetch } = useTable<Profile>('profiles');
+  const { data: profiles, loading, refetch } = useTable<Profile>('profiles');
   const { user, role } = useAuth();
   const [search, setSearch] = useState('');
 
@@ -94,6 +94,8 @@ export default function UsersPage() {
       setInviteState('error');
     }
   };
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

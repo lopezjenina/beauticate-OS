@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, PageLoader } from '@/components/ui/shared';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatPeso, formatPesoK, formatDate, pct } from '@/lib/utils';
 import { AD_STATUSES, PLATFORMS } from '@/lib/constants';
@@ -45,6 +45,8 @@ export default function AdsPage() {
     await log('Campaign removed', '', 'ads', 'info', user?.name || 'System');
     setModal(null); setEditItem(null); refetch();
   };
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

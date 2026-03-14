@@ -2,6 +2,51 @@
 
 import { useEffect, ReactNode } from 'react';
 
+export function Skeleton({ w, h, r }: { w?: string | number; h?: number; r?: number }) {
+  return <div className="skeleton" style={{ width: w || '100%', height: h || 14, borderRadius: r || 6 }} />;
+}
+
+export function PageLoader() {
+  return (
+    <div>
+      {/* Header skeleton */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <Skeleton w={180} h={22} r={6} />
+          <div style={{ marginTop: 8 }}><Skeleton w={280} h={13} r={4} /></div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Skeleton w={140} h={34} r={7} />
+          <Skeleton w={100} h={34} r={7} />
+        </div>
+      </div>
+      {/* Metric cards skeleton */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+        {[1,2,3,4].map(i => (
+          <div key={i} style={{ flex: 1, minWidth: 120, background: 'var(--bg-2)', borderRadius: 10, padding: '16px 20px', border: '1px solid var(--brd)' }}>
+            <Skeleton w={60} h={10} r={3} />
+            <div style={{ marginTop: 8 }}><Skeleton w={80} h={22} r={4} /></div>
+          </div>
+        ))}
+      </div>
+      {/* Content skeleton */}
+      <div style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', padding: 20 }}>
+        {[1,2,3,4,5].map(i => (
+          <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--brd)' }}>
+            <Skeleton w={32} h={32} r={999} />
+            <div style={{ flex: 1 }}>
+              <Skeleton w="60%" h={13} r={4} />
+              <div style={{ marginTop: 6 }}><Skeleton w="40%" h={11} r={4} /></div>
+            </div>
+            <Skeleton w={70} h={24} r={4} />
+            <Skeleton w={80} h={24} r={4} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Badge({ children, color }: { children: ReactNode; color: string }) {
   return (
     <span style={{

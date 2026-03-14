@@ -2,6 +2,7 @@
 
 import { AuthProvider, useAuth } from '@/components/auth-provider';
 import { Sidebar } from '@/components/layout/sidebar';
+import { ToastProvider } from '@/components/ui/toast-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -20,5 +21,5 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AuthProvider><Shell>{children}</Shell></AuthProvider>;
+  return <AuthProvider><ToastProvider><Shell>{children}</Shell></ToastProvider></AuthProvider>;
 }

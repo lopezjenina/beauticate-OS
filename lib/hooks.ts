@@ -13,7 +13,8 @@ export function useTable<T>(table: string, orderBy?: string) {
   const fetch = useCallback(async () => {
     let q = supabase.from(table).select('*');
     if (orderBy) q = q.order(orderBy, { ascending: false });
-    const { data: r } = await q;
+    const { data: r, error } = await q;
+    if (error) console.error(`[useTable] ${table}:`, error.message);
     setData((r || []) as T[]);
     setLoading(false);
   }, [table, orderBy]);

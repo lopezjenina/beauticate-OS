@@ -1,14 +1,13 @@
 'use client';
 
 import { useTable } from '@/lib/hooks';
-import { useAuth } from '@/components/auth-provider';
-import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner } from '@/components/ui/shared';
-import { formatPesoK, pct, daysFromNow, WEEKS, statusColor } from '@/lib/utils';
+import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader } from '@/components/ui/shared';
+import { formatPesoK, daysFromNow, WEEKS } from '@/lib/utils';
 import { SALES_STAGES, PUBLISH_STATUSES, EDITORS, WEEKLY_TARGET } from '@/lib/constants';
 import type { Sale, Client, PublishItem, AdCampaign, OnboardingItem, ActivityEntry } from '@/types';
 
 export default function DashboardPage() {
-  const { data: sales } = useTable<Sale>('sales');
+  const { data: sales, loading } = useTable<Sale>('sales');
   const { data: clients } = useTable<Client>('clients');
   const { data: publishing } = useTable<PublishItem>('publishing');
   const { data: ads } = useTable<AdCampaign>('ads');
@@ -39,6 +38,8 @@ export default function DashboardPage() {
   edLoad.forEach(el => { if (el.target > 22) bottlenecks.push({ text: `${el.editor} over capacity`, severity: 'high' }); });
 
   const sevC: Record<string, string> = { high: '#E24B4A', medium: '#EF9F27', low: '#378ADD' };
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

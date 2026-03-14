@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, ProgressBar } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, ProgressBar, PageLoader } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { EDITORS, VIDEOGRAPHERS, PACKAGES } from '@/lib/constants';
@@ -66,6 +66,8 @@ export default function OnboardingPage() {
     await update('onboarding', item.id, { [key]: val, status: newCount === 4 ? 'complete' : 'in_progress' });
     refetch();
   };
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

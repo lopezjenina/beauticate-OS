@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader, PageLoader } from '@/components/ui/shared';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { PUBLISH_STATUSES, PLATFORMS } from '@/lib/constants';
@@ -54,6 +54,8 @@ export default function PublishingPage() {
   };
 
   const statusMap = Object.fromEntries(PUBLISH_STATUSES.map(s => [s.key, s]));
+
+  if (loading) return <PageLoader />;
 
   return (
     <div>

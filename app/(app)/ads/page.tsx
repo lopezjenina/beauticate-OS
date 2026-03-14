@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
+import { useToast } from '@/components/ui/toast-provider';
 import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, PageLoader } from '@/components/ui/shared';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatPeso, formatPesoK, formatDate, pct } from '@/lib/utils';
@@ -14,6 +15,7 @@ const emptyForm = { client_name: '', campaign_name: '', status: 'draft', budget:
 export default function AdsPage() {
   const { data: campaigns, loading, refetch } = useTable<AdCampaign>('ads', 'created_at');
   const { user, role } = useAuth();
+  const showToast = useToast();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'cards' | 'list'>('cards');
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
@@ -33,10 +35,37 @@ export default function AdsPage() {
 
   const handleSave = async () => {
     if (!form.client_name || !form.campaign_name) return;
-    const payload = { ...form, budget: Number(form.budget) || 0, spent: Number(form.spent) || 0, next_optimization: form.next_optimization || null, start_date: form.start_date || null };
+    const budget = Number(form.budget) || 0;
+    const spent = Number(form.spent) || 0;
+    const payload = { ...form, budget, spent, next_optimization: form.next_optimization || null, start_date: form.start_date || null };
     if (modal === 'edit' && editItem) { await update('ads', editItem.id, payload); }
     else { await insert('ads', payload); }
     await log(modal === 'edit' ? 'Campaign updated' : 'Campaign created', form.campaign_name, 'ads', 'success', user?.name || 'System');
+
+    // Send budget alert email if over budget
+    if (spent > budget && budget > 0) {
+      try {
+        const { TEAM_EMAILS } = await import('@/lib/constants');
+        const adminEmails = Object.entries(TEAM_EMAILS).filter(([, v]) => v.role === 'admin').map(([e]) => e);
+        await fetch('/api/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'budget_alert',
+            to: adminEmails,
+            data: {
+              campaignName: form.campaign_name,
+              clientName: form.client_name,
+              budget: `$${budget.toLocaleString()}`,
+              spent: `$${spent.toLocaleString()}`,
+              overage: `$${(spent - budget).toLocaleString()}`,
+            },
+          }),
+        });
+        showToast(`Budget alert sent — ${form.campaign_name} is over budget.`, 'warning');
+      } catch { /* non-blocking */ }
+    }
+
     setModal(null); setEditItem(null); refetch();
   };
 

@@ -9,11 +9,11 @@ import { Modal, FormRow, PrimaryButton } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
 import {
   LayoutDashboard, DollarSign, Shield, Video, Upload,
-  Megaphone, Clock, Users, Menu, LogOut, Settings,
+  Megaphone, Clock, Users, Menu, LogOut, Settings, MessageSquare,
 } from 'lucide-react';
 
 const ICONS: Record<string, React.ComponentType<any>> = {
-  LayoutDashboard, DollarSign, Shield, Video, Upload, Megaphone, Clock, Users,
+  LayoutDashboard, DollarSign, Shield, Video, Upload, Megaphone, Clock, Users, MessageSquare,
 };
 
 export function Sidebar() {

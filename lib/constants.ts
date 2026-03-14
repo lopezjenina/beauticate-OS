@@ -3,10 +3,10 @@ import { RoleConfig } from '@/types';
 export const WEEKLY_TARGET = 86;
 
 export const ROLES: Record<string, RoleConfig> = {
-  admin: { label: 'Admin', color: '#7F77DD', boards: ['dashboard', 'sales', 'onboarding', 'production', 'publishing', 'ads', 'activity', 'users'], canEdit: true, canDelete: true, canManageUsers: true },
-  editor: { label: 'Editor', color: '#378ADD', boards: ['production', 'publishing', 'activity'], canEdit: true, canDelete: false, canManageUsers: false },
-  social: { label: 'Social', color: '#1D9E75', boards: ['publishing', 'activity'], canEdit: true, canDelete: false, canManageUsers: false },
-  viewer: { label: 'Viewer', color: '#888780', boards: ['dashboard', 'production', 'publishing'], canEdit: false, canDelete: false, canManageUsers: false },
+  admin: { label: 'Admin', color: '#7F77DD', boards: ['dashboard', 'sales', 'onboarding', 'production', 'publishing', 'ads', 'activity', 'users', 'chat'], canEdit: true, canDelete: true, canManageUsers: true },
+  editor: { label: 'Editor', color: '#378ADD', boards: ['production', 'publishing', 'activity', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
+  social: { label: 'Social', color: '#1D9E75', boards: ['publishing', 'activity', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
+  viewer: { label: 'Viewer', color: '#888780', boards: ['dashboard', 'production', 'publishing', 'chat'], canEdit: false, canDelete: false, canManageUsers: false },
 };
 
 export const EDITORS = ['Sergio', 'Rodrigo', 'Alex', 'Araceli'];
@@ -55,6 +55,7 @@ export const NAV_ITEMS = [
   { key: 'ads', label: 'Ads', icon: 'Megaphone' },
   { key: 'activity', label: 'Activity Log', icon: 'Clock' },
   { key: 'users', label: 'Team', icon: 'Users' },
+  { key: 'chat', label: 'Team Chat', icon: 'MessageSquare' },
 ] as const;
 
 // Pre-authorized team emails and their roles

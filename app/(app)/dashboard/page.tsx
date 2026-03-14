@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useTable } from '@/lib/hooks';
-import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader, PrimaryButton } from '@/components/ui/shared';
+import { useToast } from '@/components/ui/toast-provider';
 import { formatPesoK, daysFromNow, WEEKS } from '@/lib/utils';
 import { SALES_STAGES, PUBLISH_STATUSES, EDITORS, WEEKLY_TARGET } from '@/lib/constants';
 import type { Sale, Client, PublishItem, AdCampaign, OnboardingItem, ActivityEntry } from '@/types';
@@ -13,6 +15,8 @@ export default function DashboardPage() {
   const { data: ads } = useTable<AdCampaign>('ads');
   const { data: onboarding } = useTable<OnboardingItem>('onboarding');
   const { data: logs } = useTable<ActivityEntry>('activity_log', 'created_at');
+  const showToast = useToast();
+  const [sendingReport, setSendingReport] = useState(false);
 
   const totalT = clients.reduce((a, b) => a + b.videos_target, 0);
   const totalC = clients.reduce((a, b) => a + b.videos_complete, 0);
@@ -39,11 +43,50 @@ export default function DashboardPage() {
 
   const sevC: Record<string, string> = { high: '#E24B4A', medium: '#EF9F27', low: '#378ADD' };
 
+  const sendWeeklyReport = async () => {
+    setSendingReport(true);
+    try {
+      const adminEmails = Object.entries(
+        (await import('@/lib/constants')).TEAM_EMAILS
+      ).filter(([, v]) => v.role === 'admin').map(([email]) => email);
+
+      const res = await fetch('/api/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'weekly_report',
+          to: adminEmails,
+          data: {
+            revenue: formatPesoK(rev),
+            pipeline: formatPesoK(pipeVal),
+            activeClients: clients.length,
+            videosComplete: totalC,
+            videosTarget: totalT,
+            contentPending: pending,
+            activeAds: activeAds,
+            adSpend: formatPesoK(adSpend),
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to send');
+      showToast('Weekly report sent to admins.', 'success');
+    } catch (e: any) {
+      showToast(e.message || 'Failed to send report.', 'error');
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
 
   return (
     <div>
-      <PageHeader title="Executive dashboard" subtitle="60-second visibility. If something is broken, you'll see it here." />
+      <PageHeader title="Executive dashboard" subtitle="60-second visibility. If something is broken, you'll see it here.">
+        <PrimaryButton onClick={sendWeeklyReport} disabled={sendingReport}>
+          {sendingReport ? 'Sending...' : 'Email report'}
+        </PrimaryButton>
+      </PageHeader>
 
       <div className="grid grid-cols-3 gap-3 mb-6">
         <MetricCard label="Active clients" value={clients.length} accent="#7F77DD" />

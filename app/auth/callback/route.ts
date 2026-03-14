@@ -21,14 +21,19 @@ export async function GET(request: Request) {
 
       if (!profile) {
         const email = data.user.email || '';
+        const meta = data.user.user_metadata || {};
         const teamInfo = TEAM_EMAILS[email.toLowerCase()];
+
+        // Priority: invite metadata > TEAM_EMAILS allowlist > viewer default
+        const name = meta.name || teamInfo?.name || meta.full_name || email.split('@')[0];
+        const role = meta.role || teamInfo?.role || 'viewer';
 
         await supabase.from('profiles').insert({
           id: data.user.id,
-          email: email,
-          name: teamInfo?.name || data.user.user_metadata?.full_name || email.split('@')[0],
-          avatar: (teamInfo?.name || email.split('@')[0]).slice(0, 2).toUpperCase(),
-          role: teamInfo?.role || 'viewer',
+          email,
+          name,
+          avatar: name.slice(0, 2).toUpperCase(),
+          role,
           is_active: true,
           last_login: new Date().toISOString(),
         });

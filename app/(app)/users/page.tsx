@@ -1,12 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTable, update, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
 import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { ROLES } from '@/lib/constants';
 import type { Profile } from '@/types';
+
+type PendingInvite = { id: string; email: string; name: string; role: string; invited_at: string };
+
+function timeAgo(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 const ROLE_OPTIONS = Object.entries(ROLES).map(([key, cfg]) => ({ key, label: cfg.label, color: cfg.color }));
 
@@ -19,6 +28,22 @@ export default function UsersPage() {
   const [editModal, setEditModal] = useState(false);
   const [editItem, setEditItem] = useState<Profile | null>(null);
   const [editForm, setEditForm] = useState({ role: 'viewer', is_active: true });
+
+  // Pending invites
+  const [pending, setPending] = useState<PendingInvite[]>([]);
+  const fetchPending = useCallback(async () => {
+    try {
+      const res = await fetch('/api/invite');
+      if (res.ok) { const j = await res.json(); setPending(j.pending ?? []); }
+    } catch { /* service role key not set yet */ }
+  }, []);
+  useEffect(() => { if (role.canManageUsers) fetchPending(); }, [role.canManageUsers, fetchPending]);
+
+  const revokeInvite = async (invite: PendingInvite) => {
+    await fetch('/api/invite', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: invite.id }) });
+    await log('Invite revoked', invite.email, 'users', 'info', user?.name || 'System');
+    fetchPending();
+  };
 
   // Invite modal
   const [inviteModal, setInviteModal] = useState(false);
@@ -62,6 +87,7 @@ export default function UsersPage() {
       } else {
         await log('User invited', `${inviteForm.name} (${inviteForm.email}) as ${inviteForm.role}`, 'users', 'success', user?.name || 'System');
         setInviteState('success');
+        fetchPending();
       }
     } catch (err: any) {
       setInviteError(err.message);
@@ -132,6 +158,48 @@ export default function UsersPage() {
         </table>
         {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)', fontSize: 13 }}>No team members found.</div>}
       </div>
+
+      {role.canManageUsers && pending.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mut)', marginBottom: 10 }}>
+            Pending invites ({pending.length})
+          </div>
+          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Invited</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map(invite => {
+                  const rc = ROLES[invite.role];
+                  return (
+                    <tr key={invite.id}>
+                      <td style={{ fontWeight: 600 }}>{invite.name || '—'}</td>
+                      <td style={{ color: 'var(--mut)', fontSize: 12 }}>{invite.email}</td>
+                      <td><Badge color={rc?.color || '#888'}>{rc?.label || invite.role}</Badge></td>
+                      <td style={{ fontSize: 12, color: 'var(--mut)' }}>{timeAgo(invite.invited_at)}</td>
+                      <td>
+                        <button
+                          onClick={() => revokeInvite(invite)}
+                          style={{ background: 'none', border: '1px solid var(--brd)', borderRadius: 5, padding: '3px 8px', color: '#f87171', cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Edit role modal */}
       <Modal open={editModal} onClose={() => { setEditModal(false); setEditItem(null); }} title={editItem ? `Edit ${editItem.name}` : 'Edit user'}>

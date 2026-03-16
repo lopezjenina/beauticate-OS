@@ -46,3 +46,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const caller = await requireAdmin();
+    if (!caller) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const { userId } = await request.json() as { userId: string };
+    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+
+    const adminClient = createAdminClient();
+    // Delete profile first (in case no cascade), then auth user
+    await adminClient.from('profiles').delete().eq('id', userId);
+    const { error } = await adminClient.auth.admin.deleteUser(userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}

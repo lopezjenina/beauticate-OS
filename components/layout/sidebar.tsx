@@ -8,23 +8,25 @@ import { NotificationPanel } from '@/components/layout/notification-panel';
 import { ROLES, NAV_ITEMS } from '@/lib/constants';
 import { Modal, FormRow, PrimaryButton } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 import {
   LayoutDashboard, DollarSign, Shield, Video, Upload,
-  Megaphone, Clock, Users, Menu, LogOut, Settings, MessageSquare,
+  Megaphone, Clock, Users, Menu, LogOut, Settings, MessageSquare, X,
 } from 'lucide-react';
 
 const ICONS: Record<string, React.ComponentType<any>> = {
   LayoutDashboard, DollarSign, Shield, Video, Upload, Megaphone, Clock, Users, MessageSquare,
 };
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function Sidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { profile, loading } = useProfile();
   const { addLog } = useActivityLog();
   const router = useRouter();
@@ -33,11 +35,26 @@ export function Sidebar() {
 
   const currentBoard = pathname.split('/').pop() || 'dashboard';
 
+  // Detect mobile
+  useEffect(() => {
+    const check = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Close mobile drawer on navigation
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
   // Nav loading state
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   useEffect(() => { setNavigatingTo(null); }, [pathname]);
 
-  // Board notification badges (unread activity since last visit)
+  // Board notification badges
   const [unreadBoards, setUnreadBoards] = useState<Record<string, number>>({});
   useEffect(() => {
     const supabase = createClient();
@@ -53,7 +70,7 @@ export function Sidebar() {
     return () => { supabase.removeChannel(ch); };
   }, [currentBoard]);
 
-  // Settings modal state
+  // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'profile' | 'security'>('profile');
   const [nameVal, setNameVal] = useState('');
@@ -66,8 +83,7 @@ export function Sidebar() {
   const openSettings = () => {
     setNameVal(profile?.name || '');
     setEmailVal(profile?.email || '');
-    setNewPassword('');
-    setConfirmPassword('');
+    setNewPassword(''); setConfirmPassword('');
     setSettingsTab('profile');
     setSettingsOpen(true);
   };
@@ -79,11 +95,8 @@ export function Sidebar() {
       const { error } = await supabase.from('profiles').update({ name: nameVal }).eq('id', profile.id);
       if (error) throw error;
       showToast('Profile updated.', 'success');
-    } catch (e: any) {
-      showToast(e.message || 'Update failed.', 'error');
-    } finally {
-      setSettingsLoading(false);
-    }
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setSettingsLoading(false); }
   };
 
   const saveEmail = async () => {
@@ -91,43 +104,28 @@ export function Sidebar() {
     try {
       const { error } = await supabase.auth.updateUser({ email: emailVal });
       if (error) throw error;
-      showToast('Confirmation sent to new email. Check your inbox.', 'info');
-    } catch (e: any) {
-      showToast(e.message || 'Update failed.', 'error');
-    } finally {
-      setSettingsLoading(false);
-    }
+      showToast('Confirmation sent to new email.', 'info');
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setSettingsLoading(false); }
   };
 
   const savePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      showToast('Passwords do not match.', 'error');
-      return;
-    }
-    if (newPassword.length < 8) {
-      showToast('Password must be at least 8 characters.', 'error');
-      return;
-    }
+    if (newPassword !== confirmPassword) { showToast('Passwords do not match.', 'error'); return; }
+    if (newPassword.length < 8) { showToast('Password must be at least 8 characters.', 'error'); return; }
     setSettingsLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      showToast('Password updated successfully.', 'success');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (e: any) {
-      showToast(e.message || 'Update failed.', 'error');
-    } finally {
-      setSettingsLoading(false);
-    }
+      showToast('Password updated.', 'success');
+      setNewPassword(''); setConfirmPassword('');
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setSettingsLoading(false); }
   };
 
   const role = profile ? ROLES[profile.role] || ROLES.viewer : ROLES.viewer;
 
   const handleLogout = async () => {
-    if (profile) {
-      await addLog(`${profile.name} signed out`, '', 'system', 'info', profile.name);
-    }
+    if (profile) await addLog(`${profile.name} signed out`, '', 'system', 'info', profile.name);
     await supabase.auth.signOut();
     router.push('/login');
   };
@@ -160,15 +158,170 @@ export function Sidebar() {
 
   const visibleNav = NAV_ITEMS.filter(n => role.boards.includes(n.key));
 
+  // ── Shared nav items renderer ────────────────────────────
+  const NavItems = ({ expanded }: { expanded: boolean }) => (
+    <>
+      {visibleNav.map(item => {
+        const active = currentBoard === item.key;
+        const isNavigating = navigatingTo === item.key;
+        const IconComp = ICONS[item.icon];
+        return (
+          <button
+            key={item.key}
+            onClick={() => navigate(item.key)}
+            style={{
+              display: 'flex', alignItems: 'center',
+              gap: expanded ? 10 : 0,
+              width: '100%',
+              padding: expanded ? '10px 12px' : '9px 0',
+              background: active ? 'rgba(127,119,221,0.12)' : 'transparent',
+              color: active ? '#7F77DD' : 'var(--mut)',
+              border: 'none', borderRadius: 8, cursor: 'pointer',
+              fontSize: 13, fontWeight: active ? 700 : 400,
+              justifyContent: expanded ? 'flex-start' : 'center',
+              textAlign: 'left', marginBottom: 2,
+            }}
+          >
+            {isNavigating
+              ? <div className="nav-spinner" />
+              : (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  {IconComp && <IconComp size={18} style={{ opacity: active ? 1 : 0.7, display: 'block' }} />}
+                  {!active && unreadBoards[item.key] > 0 && (
+                    <span style={{ position: 'absolute', top: -5, right: -6, background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', lineHeight: 1 }}>
+                      {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
+                    </span>
+                  )}
+                </div>
+              )}
+            {expanded && <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{item.label}</span>}
+            {expanded && !active && unreadBoards[item.key] > 0 && (
+              <span style={{ background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', flexShrink: 0 }}>
+                {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </>
+  );
+
+  // ── Settings modal (shared) ─────────────────────────────
+  const SettingsModal = () => (
+    <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Account settings" width={460}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--brd)', paddingBottom: 12 }}>
+        {(['profile', 'security'] as const).map(tab => (
+          <button key={tab} onClick={() => setSettingsTab(tab)} style={{ background: settingsTab === tab ? 'rgba(127,119,221,0.12)' : 'transparent', color: settingsTab === tab ? '#7F77DD' : 'var(--mut)', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
+            {tab}
+          </button>
+        ))}
+      </div>
+      {settingsTab === 'profile' && (
+        <>
+          <FormRow label="Display name"><input value={nameVal} onChange={e => setNameVal(e.target.value)} placeholder="Your name" /></FormRow>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveProfile} disabled={settingsLoading || !nameVal.trim()}>{settingsLoading ? 'Saving...' : 'Save name'}</PrimaryButton></div>
+          <div style={{ borderTop: '1px solid var(--brd)', margin: '20px 0' }} />
+          <FormRow label="Email address"><input type="email" value={emailVal} onChange={e => setEmailVal(e.target.value)} placeholder="you@example.com" /></FormRow>
+          <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 14 }}>A confirmation link will be sent to the new email.</div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveEmail} disabled={settingsLoading || !emailVal.trim()}>{settingsLoading ? 'Sending...' : 'Update email'}</PrimaryButton></div>
+        </>
+      )}
+      {settingsTab === 'security' && (
+        <>
+          <FormRow label="New password"><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></FormRow>
+          <FormRow label="Confirm password"><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" /></FormRow>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={savePassword} disabled={settingsLoading || !newPassword || !confirmPassword}>{settingsLoading ? 'Updating...' : 'Change password'}</PrimaryButton></div>
+        </>
+      )}
+    </Modal>
+  );
+
+  // ── MOBILE layout ───────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        {/* Fixed top bar */}
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 52, background: 'var(--bg-1)', borderBottom: '1px solid var(--brd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 300 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#7F77DD', lineHeight: 1.2 }}>VIRAL VISION</div>
+            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--mut)' }}>OPERATING SYSTEM</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <NotificationPanel collapsed={true} />
+            <button onClick={() => setMobileOpen(true)} aria-label="Open menu" style={{ background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: 8 }}>
+              <Menu size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Backdrop */}
+        {mobileOpen && (
+          <div
+            onClick={() => setMobileOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 398, backdropFilter: 'blur(2px)' }}
+          />
+        )}
+
+        {/* Slide-in drawer */}
+        <div style={{
+          position: 'fixed', top: 0, left: 0, height: '100dvh', width: 272,
+          background: 'var(--bg-1)', borderRight: '1px solid var(--brd)',
+          zIndex: 399, display: 'flex', flexDirection: 'column',
+          transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
+        }}>
+          {/* Drawer header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 10px' }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#7F77DD' }}>VIRAL VISION</div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--mut)' }}>OPERATING SYSTEM</div>
+            </div>
+            <button onClick={() => setMobileOpen(false)} aria-label="Close menu" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6 }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Nav */}
+          <div style={{ flex: 1, padding: '4px 10px', overflowY: 'auto' }}>
+            <NavItems expanded={true} />
+          </div>
+
+          {/* Notifications */}
+          <div style={{ padding: '4px 10px', borderTop: '1px solid var(--brd)' }}>
+            <NotificationPanel collapsed={false} />
+          </div>
+
+          {/* Profile footer */}
+          <div style={{ padding: '12px 14px', borderTop: '1px solid var(--brd)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: (role.color || '#7F77DD') + '30', color: role.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                {profile.avatar || getInitials(profile.name)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
+                <span style={{ fontSize: 10, fontWeight: 600, color: role.color, background: (role.color || '#888') + '28', padding: '1px 8px', borderRadius: 10 }}>{role.label}</span>
+              </div>
+              <button onClick={openSettings} aria-label="Account settings" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4 }}>
+                <Settings size={15} />
+              </button>
+            </div>
+            <button onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', background: 'transparent', border: '1px solid var(--brd)', borderRadius: 8, color: 'var(--fg)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
+              <LogOut size={14} /> Sign out
+            </button>
+          </div>
+        </div>
+
+        <SettingsModal />
+      </>
+    );
+  }
+
+  // ── DESKTOP layout ──────────────────────────────────────
   return (
     <>
       <div
         className="flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden"
-        style={{
-          width: sidebarOpen ? 224 : 56,
-          background: 'var(--bg-1)',
-          borderRight: '1px solid var(--brd)',
-        }}
+        style={{ width: sidebarOpen ? 224 : 56, background: 'var(--bg-1)', borderRight: '1px solid var(--brd)' }}
       >
         <div className="flex items-center gap-2 p-4" style={{ justifyContent: sidebarOpen ? 'space-between' : 'center' }}>
           {sidebarOpen && (
@@ -183,51 +336,7 @@ export function Sidebar() {
         </div>
 
         <div className="flex-1 px-1.5 py-1">
-          {visibleNav.map(item => {
-            const active = currentBoard === item.key;
-            const isNavigating = navigatingTo === item.key;
-            const IconComp = ICONS[item.icon];
-            return (
-              <button
-                key={item.key}
-                onClick={() => navigate(item.key)}
-                className="flex items-center gap-2.5 w-full rounded-lg mb-0.5 transition-all"
-                style={{
-                  padding: sidebarOpen ? '9px 12px' : '9px 0',
-                  background: active ? 'rgba(127,119,221,0.12)' : 'transparent',
-                  color: active ? '#7F77DD' : 'var(--mut)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 13,
-                  fontWeight: active ? 700 : 400,
-                  justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                  textAlign: 'left',
-                }}
-              >
-                {isNavigating
-                  ? <div className="nav-spinner" style={{ marginLeft: sidebarOpen ? 0 : 'auto', marginRight: sidebarOpen ? 0 : 'auto' }} />
-                  : (
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
-                      {IconComp && <IconComp size={18} style={{ opacity: active ? 1 : 0.7, display: 'block' }} />}
-                      {!active && unreadBoards[item.key] > 0 && (
-                        <span style={{ position: 'absolute', top: -5, right: -6, background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', lineHeight: 1 }}>
-                          {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
-                        </span>
-                      )}
-                    </div>
-                  )
-                }
-                {sidebarOpen && (
-                  <span className="whitespace-nowrap" style={{ flex: 1 }}>{item.label}</span>
-                )}
-                {sidebarOpen && !active && unreadBoards[item.key] > 0 && (
-                  <span style={{ background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', flexShrink: 0 }}>
-                    {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          <NavItems expanded={sidebarOpen} />
         </div>
 
         <div className="px-1.5 py-1" style={{ borderTop: '1px solid var(--brd)' }}>
@@ -237,106 +346,25 @@ export function Sidebar() {
         {sidebarOpen && (
           <div className="p-3" style={{ borderTop: '1px solid var(--brd)' }}>
             <div className="flex items-center gap-2.5 mb-3 px-1">
-              <div
-                className="flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0"
-                style={{ width: 32, height: 32, background: (role.color || '#7F77DD') + '30', color: role.color }}
-              >
+              <div className="flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0" style={{ width: 32, height: 32, background: (role.color || '#7F77DD') + '30', color: role.color }}>
                 {profile.avatar || getInitials(profile.name)}
               </div>
               <div className="flex-1 overflow-hidden">
                 <div className="text-sm font-bold truncate">{profile.name}</div>
-                <span
-                  className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: (role.color || '#888') + '28', color: role.color }}
-                >
-                  {role.label}
-                </span>
+                <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: (role.color || '#888') + '28', color: role.color }}>{role.label}</span>
               </div>
-              <button
-                onClick={openSettings}
-                title="Settings"
-                aria-label="Account settings"
-                style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0, opacity: 0.8 }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}
-              >
+              <button onClick={openSettings} title="Settings" aria-label="Account settings" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0, opacity: 0.8 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}>
                 <Settings size={14} />
               </button>
             </div>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium"
-              style={{ background: 'transparent', border: '1px solid var(--brd)', color: 'var(--fg)', cursor: 'pointer' }}
-            >
+            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium" style={{ background: 'transparent', border: '1px solid var(--brd)', color: 'var(--fg)', cursor: 'pointer' }}>
               <LogOut size={14} /> Sign out
             </button>
           </div>
         )}
       </div>
 
-      {/* Settings Modal */}
-      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Account settings" width={460}>
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--brd)', paddingBottom: 12 }}>
-          {(['profile', 'security'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setSettingsTab(tab)}
-              style={{
-                background: settingsTab === tab ? 'rgba(127,119,221,0.12)' : 'transparent',
-                color: settingsTab === tab ? '#7F77DD' : 'var(--mut)',
-                border: 'none', borderRadius: 6, padding: '6px 14px',
-                cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize',
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {settingsTab === 'profile' && (
-          <>
-            <FormRow label="Display name">
-              <input value={nameVal} onChange={e => setNameVal(e.target.value)} placeholder="Your name" />
-            </FormRow>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <PrimaryButton onClick={saveProfile} disabled={settingsLoading || !nameVal.trim()}>
-                {settingsLoading ? 'Saving...' : 'Save name'}
-              </PrimaryButton>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--brd)', margin: '20px 0' }} />
-
-            <FormRow label="Email address">
-              <input type="email" value={emailVal} onChange={e => setEmailVal(e.target.value)} placeholder="you@example.com" />
-            </FormRow>
-            <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 14 }}>
-              A confirmation link will be sent to the new email.
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <PrimaryButton onClick={saveEmail} disabled={settingsLoading || !emailVal.trim()}>
-                {settingsLoading ? 'Sending...' : 'Update email'}
-              </PrimaryButton>
-            </div>
-          </>
-        )}
-
-        {settingsTab === 'security' && (
-          <>
-            <FormRow label="New password">
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" />
-            </FormRow>
-            <FormRow label="Confirm password">
-              <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" />
-            </FormRow>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <PrimaryButton onClick={savePassword} disabled={settingsLoading || !newPassword || !confirmPassword}>
-                {settingsLoading ? 'Updating...' : 'Change password'}
-              </PrimaryButton>
-            </div>
-          </>
-        )}
-      </Modal>
+      <SettingsModal />
     </>
   );
 }

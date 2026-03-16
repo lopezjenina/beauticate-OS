@@ -107,7 +107,7 @@ export default function PublishingPage() {
                         {weekItems.map(item => {
                           const st = statusMap[item.status];
                           return (
-                            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
+                            <tr key={item.id} style={{ cursor: canEditPublishing ? 'pointer' : 'default' }} onClick={() => { if (canEditPublishing) openEdit(item); }}>
                               <td style={{ fontWeight: 600 }}>{item.title}</td>
                               <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.client_name}</td>
                               <td>{item.platform ? <Badge color="#7F77DD">{item.platform}</Badge> : <span style={{ color: 'var(--mut)', fontSize: 12 }}>—</span>}</td>
@@ -158,11 +158,11 @@ export default function PublishingPage() {
                     draggable={canEditPublishing}
                     onDragStart={() => setDragId(item.id)}
                     onDragEnd={() => { setDragId(null); setDragOver(null); }}
-                    onClick={() => openEdit(item)}
+                    onClick={() => { if (canEditPublishing) openEdit(item); }}
                     style={{
                       background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 8,
                       padding: '10px 12px', marginBottom: 6,
-                      cursor: canEditPublishing ? 'grab' : 'pointer',
+                      cursor: canEditPublishing ? 'grab' : 'default',
                       opacity: dragId === item.id ? 0.45 : 1,
                       transition: 'opacity 0.15s',
                       borderLeft: `2px solid ${status.color}`,

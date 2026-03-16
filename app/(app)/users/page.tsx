@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTable, update, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow, PageLoader } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, PageLoader, ConfirmDialog } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
 import { ROLES } from '@/lib/constants';
@@ -37,6 +37,7 @@ export default function UsersPage() {
   const [editItem, setEditItem] = useState<Profile | null>(null);
   const [editForm, setEditForm] = useState({ role: 'viewer', is_active: true, name: '', email: '', newPassword: '' });
   const [editSaving, setEditSaving] = useState(false);
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<Profile | null>(null);
 
   // Pending invites
   const [pending, setPending] = useState<PendingInvite[]>([]);
@@ -101,6 +102,24 @@ export default function UsersPage() {
       showToast(e.message || 'Update failed.', 'error');
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (profile: Profile) => {
+    try {
+      const res = await fetch('/api/admin/update-user', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Delete failed');
+      await log('User deleted', `${profile.name} (${profile.email})`, 'users', 'info', user?.name || 'System');
+      showToast('User deleted.', 'success');
+      setEditModal(false); setEditItem(null); setConfirmDeleteUser(null); refetch();
+    } catch (e: any) {
+      showToast(e.message || 'Delete failed.', 'error');
+      setConfirmDeleteUser(null);
     }
   };
 
@@ -279,15 +298,31 @@ export default function UsersPage() {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <GhostButton onClick={() => { setEditModal(false); setEditItem(null); }}>Cancel</GhostButton>
-          {role.canManageUsers && (
-            <PrimaryButton onClick={handleSave} disabled={editSaving}>
-              {editSaving ? 'Saving...' : 'Save changes'}
-            </PrimaryButton>
-          )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+          <div>
+            {role.canManageUsers && editItem && editItem.id !== user?.id && (
+              <DangerButton onClick={() => setConfirmDeleteUser(editItem)}>Delete user</DangerButton>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <GhostButton onClick={() => { setEditModal(false); setEditItem(null); }}>Cancel</GhostButton>
+            {role.canManageUsers && (
+              <PrimaryButton onClick={handleSave} disabled={editSaving}>
+                {editSaving ? 'Saving...' : 'Save changes'}
+              </PrimaryButton>
+            )}
+          </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!confirmDeleteUser}
+        title={`Delete ${confirmDeleteUser?.name}?`}
+        message="This will permanently remove their account and access. This cannot be undone."
+        confirmLabel="Delete user"
+        danger
+        onCancel={() => setConfirmDeleteUser(null)}
+        onConfirm={() => { if (confirmDeleteUser) handleDeleteUser(confirmDeleteUser); }}
+      />
 
       {/* Invite user modal */}
       <Modal open={inviteModal} onClose={() => { setInviteModal(false); setInviteState('idle'); }} title="Invite team member">

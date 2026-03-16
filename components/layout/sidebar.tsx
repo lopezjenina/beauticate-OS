@@ -153,6 +153,12 @@ export function Sidebar() {
           setUnreadBoards(prev => ({ ...prev, [board]: (prev[board] || 0) + 1 }));
         }
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        // Badge the Channels nav item when a new message arrives and user isn't on chat
+        if (currentBoard !== 'chat') {
+          setUnreadBoards(prev => ({ ...prev, chat: (prev.chat || 0) + 1 }));
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [currentBoard]);

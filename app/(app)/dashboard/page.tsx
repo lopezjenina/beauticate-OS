@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTable } from '@/lib/hooks';
-import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader, PrimaryButton, Modal, GhostButton, ConfirmDialog } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader, PrimaryButton, Modal, GhostButton } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatPesoK, daysFromNow, WEEKS } from '@/lib/utils';
 import { SALES_STAGES, PUBLISH_STATUSES, EDITORS, WEEKLY_TARGET } from '@/lib/constants';
@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [sendingReport, setSendingReport] = useState(false);
   const [reportConfirmOpen, setReportConfirmOpen] = useState(false);
   const [reportRecipients, setReportRecipients] = useState<{email: string; name: string}[]>([]);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
 
   const totalT = clients.reduce((a, b) => a + b.videos_target, 0);
   const totalC = clients.reduce((a, b) => a + b.videos_complete, 0);
@@ -51,6 +52,7 @@ export default function DashboardPage() {
       .filter(([, v]) => v.role === 'admin')
       .map(([email, v]) => ({ email, name: v.name }));
     setReportRecipients(recipients);
+    setSelectedEmails(new Set(recipients.map(r => r.email)));
     setReportConfirmOpen(true);
   };
 
@@ -58,7 +60,7 @@ export default function DashboardPage() {
     setReportConfirmOpen(false);
     setSendingReport(true);
     try {
-      const adminEmails = reportRecipients.map(r => r.email);
+      const adminEmails = [...selectedEmails];
 
       const res = await fetch('/api/email', {
         method: 'POST',
@@ -211,24 +213,49 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
-      <ConfirmDialog
-        open={reportConfirmOpen}
-        title="Send weekly report"
-        confirmLabel="Send report"
-        onCancel={() => setReportConfirmOpen(false)}
-        onConfirm={sendWeeklyReport}
-        message={
-          <div>
-            <div style={{ marginBottom: 12 }}>This report will be emailed to:</div>
-            {reportRecipients.map(r => (
-              <div key={r.email} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--bg-2)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
-                <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{r.name}</span>
-                <span style={{ color: 'var(--mut)' }}>{r.email}</span>
-              </div>
-            ))}
-          </div>
-        }
-      />
+      <Modal open={reportConfirmOpen} onClose={() => setReportConfirmOpen(false)} title="Send weekly report">
+        <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--mut)' }}>Choose who receives this report:</div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <button
+            onClick={() => {
+              if (selectedEmails.size === reportRecipients.length) {
+                setSelectedEmails(new Set());
+              } else {
+                setSelectedEmails(new Set(reportRecipients.map(r => r.email)));
+              }
+            }}
+            style={{ fontSize: 11, color: '#7F77DD', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            {selectedEmails.size === reportRecipients.length ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+          {reportRecipients.map(r => (
+            <label key={r.email} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: 'var(--bg-2)', borderRadius: 8, border: `1px solid ${selectedEmails.has(r.email) ? 'rgba(127,119,221,0.4)' : 'var(--brd)'}`, cursor: 'pointer', transition: 'border-color 0.15s' }}>
+              <input
+                type="checkbox"
+                checked={selectedEmails.has(r.email)}
+                onChange={() => {
+                  setSelectedEmails(prev => {
+                    const next = new Set(prev);
+                    if (next.has(r.email)) next.delete(r.email); else next.add(r.email);
+                    return next;
+                  });
+                }}
+                style={{ accentColor: '#7F77DD', width: 14, height: 14, cursor: 'pointer' }}
+              />
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: 'var(--fg)' }}>{r.name}</span>
+              <span style={{ fontSize: 11, color: 'var(--mut)' }}>{r.email}</span>
+            </label>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <GhostButton onClick={() => setReportConfirmOpen(false)}>Cancel</GhostButton>
+          <PrimaryButton onClick={sendWeeklyReport} disabled={selectedEmails.size === 0}>
+            Send to {selectedEmails.size === 0 ? 'nobody' : selectedEmails.size === 1 ? '1 person' : `${selectedEmails.size} people`}
+          </PrimaryButton>
+        </div>
+      </Modal>
     </>
   );
 }

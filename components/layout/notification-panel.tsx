@@ -49,6 +49,7 @@ export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
       <button
         onClick={() => setOpen(o => !o)}
         title="Notifications"
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         style={{
           display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
           width: '100%', padding: collapsed ? '10px 0' : '8px 10px',

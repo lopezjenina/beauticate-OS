@@ -8,6 +8,12 @@ import { NotificationPanel } from '@/components/layout/notification-panel';
 import { ROLES, NAV_ITEMS } from '@/lib/constants';
 import { Modal, FormRow, PrimaryButton } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 import {
   LayoutDashboard, DollarSign, Shield, Video, Upload,
   Megaphone, Clock, Users, Menu, LogOut, Settings, MessageSquare,
@@ -25,9 +31,27 @@ export function Sidebar() {
   const pathname = usePathname();
   const supabase = createClient();
 
+  const currentBoard = pathname.split('/').pop() || 'dashboard';
+
   // Nav loading state
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   useEffect(() => { setNavigatingTo(null); }, [pathname]);
+
+  // Board notification badges (unread activity since last visit)
+  const [unreadBoards, setUnreadBoards] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const supabase = createClient();
+    const ch = supabase
+      .channel('sidebar_activity')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, payload => {
+        const board = (payload.new as any).board as string | undefined;
+        if (board && board !== currentBoard) {
+          setUnreadBoards(prev => ({ ...prev, [board]: (prev[board] || 0) + 1 }));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentBoard]);
 
   // Settings modal state
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -99,7 +123,6 @@ export function Sidebar() {
   };
 
   const role = profile ? ROLES[profile.role] || ROLES.viewer : ROLES.viewer;
-  const currentBoard = pathname.split('/').pop() || 'dashboard';
 
   const handleLogout = async () => {
     if (profile) {
@@ -111,6 +134,7 @@ export function Sidebar() {
 
   const navigate = (key: string) => {
     setNavigatingTo(key);
+    setUnreadBoards(prev => { const next = { ...prev }; delete next[key]; return next; });
     router.push(`/${key}`);
   };
 
@@ -150,10 +174,10 @@ export function Sidebar() {
           {sidebarOpen && (
             <div>
               <div className="text-sm font-extrabold" style={{ color: '#7F77DD' }}>VIRAL VISION</div>
-              <div className="text-[9px] font-semibold tracking-widest" style={{ color: 'var(--mut)' }}>OPERATING SYSTEM</div>
+              <div className="text-[11px] font-semibold tracking-widest" style={{ color: 'var(--mut)' }}>OPERATING SYSTEM</div>
             </div>
           )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6 }}>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6 }}>
             <Menu size={16} />
           </button>
         </div>
@@ -177,13 +201,30 @@ export function Sidebar() {
                   fontSize: 13,
                   fontWeight: active ? 700 : 400,
                   justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                  textAlign: 'left',
                 }}
               >
                 {isNavigating
                   ? <div className="nav-spinner" style={{ marginLeft: sidebarOpen ? 0 : 'auto', marginRight: sidebarOpen ? 0 : 'auto' }} />
-                  : IconComp && <IconComp size={18} style={{ opacity: active ? 1 : 0.5, flexShrink: 0 }} />
+                  : (
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      {IconComp && <IconComp size={18} style={{ opacity: active ? 1 : 0.7, display: 'block' }} />}
+                      {!active && unreadBoards[item.key] > 0 && (
+                        <span style={{ position: 'absolute', top: -5, right: -6, background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, minWidth: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', lineHeight: 1 }}>
+                          {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
+                        </span>
+                      )}
+                    </div>
+                  )
                 }
-                {sidebarOpen && <span className="whitespace-nowrap">{item.label}</span>}
+                {sidebarOpen && (
+                  <span className="whitespace-nowrap" style={{ flex: 1 }}>{item.label}</span>
+                )}
+                {sidebarOpen && !active && unreadBoards[item.key] > 0 && (
+                  <span style={{ background: '#E24B4A', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', flexShrink: 0 }}>
+                    {unreadBoards[item.key] > 9 ? '9+' : unreadBoards[item.key]}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -200,13 +241,13 @@ export function Sidebar() {
                 className="flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0"
                 style={{ width: 32, height: 32, background: (role.color || '#7F77DD') + '30', color: role.color }}
               >
-                {profile.avatar || profile.name.slice(0, 2).toUpperCase()}
+                {profile.avatar || getInitials(profile.name)}
               </div>
               <div className="flex-1 overflow-hidden">
                 <div className="text-sm font-bold truncate">{profile.name}</div>
                 <span
-                  className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: (role.color || '#888') + '1A', color: role.color }}
+                  className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: (role.color || '#888') + '28', color: role.color }}
                 >
                   {role.label}
                 </span>
@@ -214,9 +255,10 @@ export function Sidebar() {
               <button
                 onClick={openSettings}
                 title="Settings"
-                style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0, opacity: 0.6 }}
+                aria-label="Account settings"
+                style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0, opacity: 0.8 }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}
               >
                 <Settings size={14} />
               </button>
@@ -224,7 +266,7 @@ export function Sidebar() {
             <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium"
-              style={{ background: 'transparent', border: '1px solid var(--brd)', color: 'var(--mut)', cursor: 'pointer' }}
+              style={{ background: 'transparent', border: '1px solid var(--brd)', color: 'var(--fg)', cursor: 'pointer' }}
             >
               <LogOut size={14} /> Sign out
             </button>

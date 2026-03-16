@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { supabase } from '@/lib/hooks';
 import { ROLES } from '@/lib/constants';
@@ -17,28 +17,27 @@ function timeLabel(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function Avatar({ name, color }: { name: string; color: string }) {
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function Avatar({ name, color, size = 32 }: { name: string; color: string; size?: number }) {
   return (
-    <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, background: color + '25', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-      {(name || '?').slice(0, 2).toUpperCase()}
+    <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, background: color + '25', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.375, fontWeight: 700 }}>
+      {getInitials(name)}
     </div>
   );
 }
 
-const AVATAR_COLORS = ['#7F77DD', '#378ADD', '#1D9E75', '#EF9F27', '#D4537E', '#639922'];
-function avatarColor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[h];
-}
-
 function MessageContent({ content, isOwn }: { content: string; isOwn: boolean }) {
-  const parts = content.split(/(@\w[\w\s]*)/g);
+  const parts = content.split(/(@[\w][\w\s]*)/g);
   return (
     <span>
       {parts.map((part, i) =>
         /^@\w/.test(part)
-          ? <span key={i} style={{ color: isOwn ? '#fff' : '#7F77DD', fontWeight: 700 }}>{part}</span>
+          ? <span key={i} style={{ color: isOwn ? '#d4d0ff' : '#7F77DD', fontWeight: 700 }}>{part}</span>
           : <span key={i}>{part}</span>
       )}
     </span>
@@ -59,6 +58,11 @@ export default function ChatPage() {
   const [newChannelName, setNewChannelName] = useState('');
   const [newChannelDesc, setNewChannelDesc] = useState('');
   const [newChannelRoles, setNewChannelRoles] = useState<string[]>(['admin', 'editor', 'social', 'viewer']);
+
+  // @mention autocomplete
+  const [mentionSuggestions, setMentionSuggestions] = useState<Profile[]>([]);
+  const [mentionIdx, setMentionIdx] = useState(0);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -67,6 +71,7 @@ export default function ChatPage() {
   }, []);
 
   const selectedChannel = channels.find(c => c.id === selectedId);
+  const profileMap = useMemo(() => Object.fromEntries(profiles.map(p => [p.id, p])), [profiles]);
 
   // Load channels + profiles
   useEffect(() => {
@@ -104,7 +109,7 @@ export default function ChatPage() {
       });
   }, [selectedId, scrollToBottom]);
 
-  // Realtime subscription — scoped to selected channel
+  // Realtime subscription
   useEffect(() => {
     if (!selectedId) return;
     const ch = supabase
@@ -124,12 +129,54 @@ export default function ChatPage() {
   }, [selectedId, scrollToBottom]);
 
   const parseMentions = useCallback((content: string): string[] => {
-    const pattern = /@(\w+)/g;
-    const words = [...content.matchAll(pattern)].map(m => m[1].toLowerCase());
+    const pattern = /@([\w]+(?:\s[\w]+)*)/g;
+    const names = [...content.matchAll(pattern)].map(m => m[1].toLowerCase());
     return profiles
-      .filter(p => words.some(w => p.name.toLowerCase().startsWith(w)) && p.id !== user?.id)
+      .filter(p => names.some(n => p.name.toLowerCase() === n) && p.id !== user?.id)
       .map(p => p.id);
   }, [profiles, user?.id]);
+
+  // @mention detection in input
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+
+    const cursor = e.target.selectionStart ?? val.length;
+    const textBefore = val.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+
+    if (match) {
+      const query = match[1].toLowerCase();
+      const filtered = profiles
+        .filter(p => p.id !== user?.id && p.name.toLowerCase().includes(query))
+        .slice(0, 6);
+      setMentionSuggestions(filtered);
+      setMentionIdx(0);
+    } else {
+      setMentionSuggestions([]);
+    }
+  };
+
+  const insertMention = useCallback((profile: Profile) => {
+    const cursor = inputRef.current?.selectionStart ?? input.length;
+    const textBefore = input.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+    if (!match) return;
+
+    const start = cursor - match[0].length;
+    const newInput = input.slice(0, start) + `@${profile.name} ` + input.slice(cursor);
+    setInput(newInput);
+    setMentionSuggestions([]);
+
+    setTimeout(() => {
+      if (inputRef.current) {
+        const pos = start + profile.name.length + 2;
+        inputRef.current.selectionStart = pos;
+        inputRef.current.selectionEnd = pos;
+        inputRef.current.focus();
+      }
+    }, 0);
+  }, [input]);
 
   const send = async () => {
     const content = input.trim();
@@ -137,6 +184,7 @@ export default function ChatPage() {
 
     setSending(true);
     setInput('');
+    setMentionSuggestions([]);
 
     const tempId = `temp_${Date.now()}`;
     const optimistic: Message = {
@@ -154,13 +202,10 @@ export default function ChatPage() {
       .select().single();
 
     if (error) {
-      console.error('Chat error:', error.message);
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setInput(content);
     } else if (saved) {
       setMessages(prev => prev.map(m => m.id === tempId ? saved as Message : m));
-
-      // Notify @mentioned users
       const mentionedIds = parseMentions(content);
       for (const mentionedUserId of mentionedIds) {
         await supabase.from('notifications').insert({
@@ -178,6 +223,16 @@ export default function ChatPage() {
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => Math.min(i + 1, mentionSuggestions.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && mentionSuggestions[mentionIdx])) {
+        e.preventDefault();
+        insertMention(mentionSuggestions[mentionIdx]);
+        return;
+      }
+      if (e.key === 'Escape') { setMentionSuggestions([]); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
@@ -203,6 +258,12 @@ export default function ChatPage() {
     isOwn: msg.user_id === user?.id,
   }));
 
+  // Channel members: profiles whose role is in allowed_roles
+  const channelMembers = useMemo(() =>
+    profiles.filter(p => selectedChannel?.allowed_roles?.includes(p.role)),
+    [profiles, selectedChannel]
+  );
+
   const ROLE_OPTIONS = ['admin', 'editor', 'social', 'viewer'];
 
   if (loadingChannels) {
@@ -216,7 +277,6 @@ export default function ChatPage() {
         <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Channels
         </div>
-
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {channels.map(ch => (
             <button
@@ -226,22 +286,21 @@ export default function ChatPage() {
                 display: 'flex', alignItems: 'center', gap: 6, width: '100%',
                 padding: '7px 14px', background: selectedId === ch.id ? 'rgba(127,119,221,0.12)' : 'transparent',
                 border: 'none', cursor: 'pointer', textAlign: 'left',
-                color: selectedId === ch.id ? '#7F77DD' : 'var(--mut)',
+                color: selectedId === ch.id ? '#7F77DD' : 'var(--fg)',
                 fontSize: 13, fontWeight: selectedId === ch.id ? 600 : 400,
-                borderRadius: 0,
+                borderRadius: 0, opacity: selectedId === ch.id ? 1 : 0.65,
               }}
             >
-              <span style={{ opacity: 0.5, fontSize: 12 }}>#</span>
+              <span style={{ fontSize: 12, opacity: 0.6 }}>#</span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.name}</span>
             </button>
           ))}
         </div>
-
         {role?.canManageUsers && (
           <div style={{ padding: '8px 10px', borderTop: '1px solid var(--brd)' }}>
             <button
               onClick={() => setNewChannelOpen(o => !o)}
-              style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--mut)', fontSize: 12, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '6px 10px', background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--fg)', fontSize: 12, cursor: 'pointer', opacity: 0.8 }}
             >
               + New channel
             </button>
@@ -252,10 +311,10 @@ export default function ChatPage() {
       {/* Message area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Channel header */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--brd)', flexShrink: 0 }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--brd)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ color: 'var(--mut)', fontSize: 18, lineHeight: 1 }}>#</span>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{selectedChannel?.name || 'Select a channel'}</h2>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selectedChannel?.name || 'Select a channel'}</h2>
           </div>
           {selectedChannel?.description && (
             <p style={{ margin: '2px 0 0', color: 'var(--mut)', fontSize: 12 }}>{selectedChannel.description}</p>
@@ -274,16 +333,21 @@ export default function ChatPage() {
             </div>
           ) : (
             grouped.map(msg => {
-              const color = avatarColor(msg.user_name);
+              const sender = profileMap[msg.user_id];
+              const senderRole = ROLES[sender?.role || 'viewer'];
+              const roleColor = senderRole?.color || '#888780';
               return (
                 <div key={msg.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: msg.isFirst ? '10px 0 2px' : '1px 0', flexDirection: msg.isOwn ? 'row-reverse' : 'row' }}>
                   <div style={{ width: 32, flexShrink: 0 }}>
-                    {msg.isFirst && <Avatar name={msg.user_name} color={color} />}
+                    {msg.isFirst && <Avatar name={msg.user_name} color={roleColor} />}
                   </div>
                   <div style={{ maxWidth: '68%', display: 'flex', flexDirection: 'column', alignItems: msg.isOwn ? 'flex-end' : 'flex-start' }}>
                     {msg.isFirst && (
                       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 4, flexDirection: msg.isOwn ? 'row-reverse' : 'row' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: msg.isOwn ? '#7F77DD' : color }}>{msg.isOwn ? 'You' : msg.user_name}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: roleColor }}>{msg.isOwn ? 'You' : msg.user_name}</span>
+                        {senderRole && !msg.isOwn && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: roleColor, background: roleColor + '18', padding: '1px 6px', borderRadius: 4 }}>{senderRole.label}</span>
+                        )}
                         <span style={{ fontSize: 11, color: 'var(--mut)' }}>{timeLabel(msg.created_at)}</span>
                       </div>
                     )}
@@ -300,59 +364,111 @@ export default function ChatPage() {
 
         {/* Input */}
         <div style={{ flexShrink: 0, borderTop: '1px solid var(--brd)', padding: '12px 20px' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder={`Message #${selectedChannel?.name || '...'} · @Name to mention`}
-              disabled={sending || !selectedId}
-              rows={1}
-              style={{ flex: 1, resize: 'none', minHeight: 42, maxHeight: 140, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--brd)', color: 'var(--fg)', fontSize: 13, fontFamily: 'inherit', outline: 'none', lineHeight: 1.5 }}
-              onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; }}
-            />
-            <button
-              onClick={send}
-              disabled={!input.trim() || sending || !selectedId}
-              style={{ background: '#7F77DD', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: input.trim() && !sending ? 'pointer' : 'not-allowed', opacity: input.trim() && !sending ? 1 : 0.4, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, height: 42 }}
-            >
-              {sending ? '...' : 'Send'}
-            </button>
+          <div style={{ position: 'relative' }}>
+            {/* @mention dropdown */}
+            {mentionSuggestions.length > 0 && (
+              <div style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, right: 60, background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.45)', zIndex: 100 }}>
+                <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mention someone</div>
+                {mentionSuggestions.map((p, i) => {
+                  const rc = ROLES[p.role];
+                  return (
+                    <button
+                      key={p.id}
+                      onMouseDown={e => { e.preventDefault(); insertMention(p); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', background: i === mentionIdx ? 'rgba(127,119,221,0.12)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', flex: 1 }}>{p.name}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: rc?.color || '#888', background: (rc?.color || '#888') + '18', padding: '2px 8px', borderRadius: 4 }}>{rc?.label || p.role}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKey}
+                placeholder={`Message #${selectedChannel?.name || '...'} · Type @ to mention`}
+                disabled={sending || !selectedId}
+                rows={1}
+                style={{ flex: 1, resize: 'none', minHeight: 42, maxHeight: 140, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-2)', border: '1px solid var(--brd)', color: 'var(--fg)', fontSize: 13, fontFamily: 'inherit', outline: 'none', lineHeight: 1.5 }}
+                onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; }}
+              />
+              <button
+                onClick={send}
+                disabled={!input.trim() || sending || !selectedId}
+                style={{ background: '#7F77DD', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: input.trim() && !sending ? 'pointer' : 'not-allowed', opacity: input.trim() && !sending ? 1 : 0.4, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0, height: 42 }}
+              >
+                {sending ? '...' : 'Send'}
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 5 }}>Enter to send · Shift+Enter for new line · @ to mention</div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>Enter to send · Shift+Enter for new line</div>
         </div>
       </div>
 
-      {/* New channel panel (admin only) */}
-      {newChannelOpen && (
-        <div style={{ width: 260, flexShrink: 0, borderLeft: '1px solid var(--brd)', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>New Channel</div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Name</label>
-            <input value={newChannelName} onChange={e => setNewChannelName(e.target.value)} placeholder="e.g. design" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--fg)', fontSize: 13 }} />
+      {/* Right panel: Members or New Channel form */}
+      <div style={{ width: 220, flexShrink: 0, borderLeft: '1px solid var(--brd)', display: 'flex', flexDirection: 'column' }}>
+        {newChannelOpen && role?.canManageUsers ? (
+          // New channel form
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>New Channel</div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Name</label>
+              <input value={newChannelName} onChange={e => setNewChannelName(e.target.value)} placeholder="e.g. design" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--fg)', fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description</label>
+              <input value={newChannelDesc} onChange={e => setNewChannelDesc(e.target.value)} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--fg)', fontSize: 13 }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Access</label>
+              {ROLE_OPTIONS.map(r => (
+                <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newChannelRoles.includes(r)}
+                    onChange={e => setNewChannelRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))}
+                    style={{ accentColor: '#7F77DD' }} />
+                  <span style={{ textTransform: 'capitalize', color: 'var(--fg)' }}>{ROLES[r]?.label || r}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
+              <button onClick={createChannel} disabled={!newChannelName.trim()} style={{ flex: 1, padding: '8px 0', background: '#7F77DD', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: newChannelName.trim() ? 'pointer' : 'not-allowed', opacity: newChannelName.trim() ? 1 : 0.5 }}>Create</button>
+              <button onClick={() => setNewChannelOpen(false)} style={{ flex: 1, padding: '8px 0', background: 'var(--bg-2)', color: 'var(--fg)', border: '1px solid var(--brd)', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Description</label>
-            <input value={newChannelDesc} onChange={e => setNewChannelDesc(e.target.value)} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 6, color: 'var(--fg)', fontSize: 13 }} />
+        ) : (
+          // Members panel
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ padding: '14px 14px 8px', fontSize: 11, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '1px solid var(--brd)' }}>
+              Members · {channelMembers.length}
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+              {channelMembers.map(p => {
+                const rc = ROLES[p.role];
+                return (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px' }}>
+                    <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: rc?.color || '#888' }}>{rc?.label || p.role}</div>
+                    </div>
+                    {p.id === user?.id && (
+                      <span style={{ fontSize: 10, color: 'var(--mut)' }}>you</span>
+                    )}
+                  </div>
+                );
+              })}
+              {channelMembers.length === 0 && (
+                <div style={{ padding: '20px 12px', color: 'var(--mut)', fontSize: 12, textAlign: 'center' }}>No members</div>
+              )}
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 6 }}>Access</label>
-            {ROLE_OPTIONS.map(r => (
-              <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 4, cursor: 'pointer' }}>
-                <input type="checkbox" checked={newChannelRoles.includes(r)}
-                  onChange={e => setNewChannelRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))}
-                  style={{ accentColor: '#7F77DD' }} />
-                <span style={{ textTransform: 'capitalize' }}>{ROLES[r]?.label || r}</span>
-              </label>
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={createChannel} disabled={!newChannelName.trim()} style={{ flex: 1, padding: '8px 0', background: '#7F77DD', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: newChannelName.trim() ? 'pointer' : 'not-allowed', opacity: newChannelName.trim() ? 1 : 0.5 }}>Create</button>
-            <button onClick={() => setNewChannelOpen(false)} style={{ flex: 1, padding: '8px 0', background: 'var(--bg-2)', color: 'var(--mut)', border: '1px solid var(--brd)', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader, PageLoader } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, WeekHeader, PageLoader, ConfirmDialog } from '@/components/ui/shared';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { PUBLISH_STATUSES, PLATFORMS } from '@/lib/constants';
@@ -17,6 +17,8 @@ export default function PublishingPage() {
   const { data: activeClients } = useTable<{ id: string; name: string }>('clients', 'name');
   const { data: onboardingItems } = useTable<{ id: string; client_name: string; status: string }>('onboarding', 'created_at');
   const { user, role } = useAuth();
+  // Only admins and social managers can edit publishing
+  const canEditPublishing = role.canManageUsers || (user as any)?.role === 'social';
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'weekly' | 'board'>('weekly');
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
@@ -25,6 +27,7 @@ export default function PublishingPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const filtered = items.filter(i => !search || i.client_name.toLowerCase().includes(search.toLowerCase()) || i.title.toLowerCase().includes(search.toLowerCase()));
 
@@ -64,7 +67,7 @@ export default function PublishingPage() {
       <PageHeader title="Publishing" subtitle="Content calendar grouped by delivery week.">
         <SearchInput value={search} onChange={setSearch} placeholder="Search content..." />
         <ViewToggle options={[{ key: 'weekly', label: 'Weekly' }, { key: 'board', label: 'Board' }]} value={view} onChange={v => setView(v as 'weekly' | 'board')} />
-        {role.canEdit && <PrimaryButton onClick={openNew}>+ New content</PrimaryButton>}
+        {canEditPublishing && <PrimaryButton onClick={openNew}>+ New content</PrimaryButton>}
       </PageHeader>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -112,8 +115,8 @@ export default function PublishingPage() {
                               <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.scheduled_date ? formatDate(item.scheduled_date) : '—'}</td>
                               <td style={{ fontSize: 11, color: 'var(--mut)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.caption || '—'}</td>
                               <td>
-                                {role.canDelete && (
-                                  <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                                {canEditPublishing && (
+                                  <button aria-label="Delete content" onClick={e => { e.stopPropagation(); setConfirmDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
                                 )}
                               </td>
                             </tr>
@@ -152,14 +155,14 @@ export default function PublishingPage() {
                 {colItems.map(item => (
                   <div
                     key={item.id}
-                    draggable={role.canEdit}
+                    draggable={canEditPublishing}
                     onDragStart={() => setDragId(item.id)}
                     onDragEnd={() => { setDragId(null); setDragOver(null); }}
                     onClick={() => openEdit(item)}
                     style={{
                       background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 8,
                       padding: '10px 12px', marginBottom: 6,
-                      cursor: role.canEdit ? 'grab' : 'pointer',
+                      cursor: canEditPublishing ? 'grab' : 'pointer',
                       opacity: dragId === item.id ? 0.45 : 1,
                       transition: 'opacity 0.15s',
                       borderLeft: `2px solid ${status.color}`,
@@ -196,13 +199,22 @@ export default function PublishingPage() {
         </FormGrid>
         <FormRow label="Caption"><textarea value={form.caption} onChange={e => setForm({ ...form, caption: e.target.value })} rows={3} /></FormRow>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
+          <div>{modal === 'edit' && editItem && canEditPublishing && <DangerButton onClick={() => setConfirmDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
-            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add content'}</PrimaryButton>}
+            {canEditPublishing && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add content'}</PrimaryButton>}
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete content?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
+      />
     </div>
   );
 }

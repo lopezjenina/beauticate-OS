@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTable } from '@/lib/hooks';
-import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader, PrimaryButton } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, AlertBanner, PageLoader, PrimaryButton, Modal, GhostButton, ConfirmDialog } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
 import { formatPesoK, daysFromNow, WEEKS } from '@/lib/utils';
 import { SALES_STAGES, PUBLISH_STATUSES, EDITORS, WEEKLY_TARGET } from '@/lib/constants';
@@ -17,6 +17,8 @@ export default function DashboardPage() {
   const { data: logs } = useTable<ActivityEntry>('activity_log', 'created_at');
   const showToast = useToast();
   const [sendingReport, setSendingReport] = useState(false);
+  const [reportConfirmOpen, setReportConfirmOpen] = useState(false);
+  const [reportRecipients, setReportRecipients] = useState<{email: string; name: string}[]>([]);
 
   const totalT = clients.reduce((a, b) => a + b.videos_target, 0);
   const totalC = clients.reduce((a, b) => a + b.videos_complete, 0);
@@ -43,12 +45,20 @@ export default function DashboardPage() {
 
   const sevC: Record<string, string> = { high: '#E24B4A', medium: '#EF9F27', low: '#378ADD' };
 
+  const openReportConfirm = async () => {
+    const { TEAM_EMAILS } = await import('@/lib/constants');
+    const recipients = Object.entries(TEAM_EMAILS)
+      .filter(([, v]) => v.role === 'admin')
+      .map(([email, v]) => ({ email, name: v.name }));
+    setReportRecipients(recipients);
+    setReportConfirmOpen(true);
+  };
+
   const sendWeeklyReport = async () => {
+    setReportConfirmOpen(false);
     setSendingReport(true);
     try {
-      const adminEmails = Object.entries(
-        (await import('@/lib/constants')).TEAM_EMAILS
-      ).filter(([, v]) => v.role === 'admin').map(([email]) => email);
+      const adminEmails = reportRecipients.map(r => r.email);
 
       const res = await fetch('/api/email', {
         method: 'POST',
@@ -81,9 +91,10 @@ export default function DashboardPage() {
   if (loading) return <PageLoader />;
 
   return (
+    <>
     <div>
       <PageHeader title="Executive dashboard" subtitle="60-second visibility. If something is broken, you'll see it here.">
-        <PrimaryButton onClick={sendWeeklyReport} disabled={sendingReport}>
+        <PrimaryButton onClick={openReportConfirm} disabled={sendingReport}>
           {sendingReport ? 'Sending...' : 'Email report'}
         </PrimaryButton>
       </PageHeader>
@@ -200,5 +211,24 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+      <ConfirmDialog
+        open={reportConfirmOpen}
+        title="Send weekly report"
+        confirmLabel="Send report"
+        onCancel={() => setReportConfirmOpen(false)}
+        onConfirm={sendWeeklyReport}
+        message={
+          <div>
+            <div style={{ marginBottom: 12 }}>This report will be emailed to:</div>
+            {reportRecipients.map(r => (
+              <div key={r.email} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--bg-2)', borderRadius: 6, marginBottom: 4, fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{r.name}</span>
+                <span style={{ color: 'var(--mut)' }}>{r.email}</span>
+              </div>
+            ))}
+          </div>
+        }
+      />
+    </>
   );
 }

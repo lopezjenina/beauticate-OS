@@ -101,7 +101,7 @@ export function Modal({ open, onClose, title, children, width }: { open: boolean
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--brd)', position: 'sticky', top: 0, background: 'var(--bg-1)', borderRadius: '14px 14px 0 0', zIndex: 1 }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '4px 6px', borderRadius: 6 }}>✕</button>
+          <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '4px 6px', borderRadius: 6 }}>✕</button>
         </div>
         <div style={{ padding: '20px 24px' }}>{children}</div>
       </div>
@@ -185,6 +185,28 @@ export function DangerButton({ onClick, children }: { onClick?: () => void; chil
     >
       {children}
     </button>
+  );
+}
+
+export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', danger = false, onConfirm, onCancel }: {
+  open: boolean; title: string; message: ReactNode;
+  confirmLabel?: string; danger?: boolean;
+  onConfirm: () => void; onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20, backdropFilter: 'blur(3px)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-1)', borderRadius: 12, border: '1px solid var(--brd)', width: 400, maxWidth: '96vw', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', padding: '24px' }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700 }}>{title}</h3>
+        <div style={{ fontSize: 13, color: 'var(--mut)', marginBottom: 24, lineHeight: 1.6 }}>{message}</div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} style={{ background: 'transparent', color: 'var(--mut)', border: '1px solid var(--brd)', borderRadius: 7, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>Cancel</button>
+          <button onClick={onConfirm} style={{ background: danger ? 'rgba(248,113,113,0.12)' : '#7F77DD', color: danger ? '#f87171' : '#fff', border: danger ? '1px solid rgba(248,113,113,0.25)' : 'none', borderRadius: 7, padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

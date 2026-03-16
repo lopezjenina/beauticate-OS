@@ -5,8 +5,15 @@ import { useTable, update, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
 import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow, PageLoader } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
+import { useToast } from '@/components/ui/toast-provider';
 import { ROLES } from '@/lib/constants';
 import type { Profile } from '@/types';
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 type PendingInvite = { id: string; email: string; name: string; role: string; invited_at: string };
 
@@ -22,12 +29,14 @@ const ROLE_OPTIONS = Object.entries(ROLES).map(([key, cfg]) => ({ key, label: cf
 export default function UsersPage() {
   const { data: profiles, loading, refetch } = useTable<Profile>('profiles');
   const { user, role } = useAuth();
+  const showToast = useToast();
   const [search, setSearch] = useState('');
 
   // Edit modal
   const [editModal, setEditModal] = useState(false);
   const [editItem, setEditItem] = useState<Profile | null>(null);
-  const [editForm, setEditForm] = useState({ role: 'viewer', is_active: true });
+  const [editForm, setEditForm] = useState({ role: 'viewer', is_active: true, name: '', email: '', newPassword: '' });
+  const [editSaving, setEditSaving] = useState(false);
 
   // Pending invites
   const [pending, setPending] = useState<PendingInvite[]>([]);
@@ -54,15 +63,45 @@ export default function UsersPage() {
   const filtered = profiles.filter(p => !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase()));
 
   const openEdit = (profile: Profile) => {
-    setEditForm({ role: profile.role, is_active: profile.is_active });
+    setEditForm({ role: profile.role, is_active: profile.is_active, name: profile.name || '', email: profile.email || '', newPassword: '' });
     setEditItem(profile); setEditModal(true);
   };
 
   const handleSave = async () => {
     if (!editItem) return;
-    await update('profiles', editItem.id, editForm);
-    await log('User role updated', `${editItem.name} → ${editForm.role}`, 'users', 'info', user?.name || 'System');
-    setEditModal(false); setEditItem(null); refetch();
+    setEditSaving(true);
+    try {
+      // Update role/status in profiles table
+      await update('profiles', editItem.id, { role: editForm.role, is_active: editForm.is_active });
+
+      // Update name/email/password via admin API if changed
+      const nameChanged = editForm.name.trim() && editForm.name.trim() !== editItem.name;
+      const emailChanged = editForm.email.trim() && editForm.email.trim() !== editItem.email;
+      const passwordChanged = editForm.newPassword.trim().length > 0;
+
+      if (nameChanged || emailChanged || passwordChanged) {
+        const body: Record<string, any> = { userId: editItem.id };
+        if (nameChanged) body.name = editForm.name.trim();
+        if (emailChanged) body.email = editForm.email.trim();
+        if (passwordChanged) body.password = editForm.newPassword;
+
+        const res = await fetch('/api/admin/update-user', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Update failed');
+      }
+
+      await log('User updated', `${editItem.name} — role: ${editForm.role}`, 'users', 'info', user?.name || 'System');
+      showToast('User updated successfully.', 'success');
+      setEditModal(false); setEditItem(null); refetch();
+    } catch (e: any) {
+      showToast(e.message || 'Update failed.', 'error');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const openInvite = () => {
@@ -131,8 +170,8 @@ export default function UsersPage() {
                 <tr key={profile.id} style={{ opacity: profile.is_active ? 1 : 0.5 }}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(127,119,221,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#7F77DD', flexShrink: 0 }}>
-                        {profile.avatar ? <img src={profile.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} /> : (profile.name || '?').slice(0, 2).toUpperCase()}
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: (ROLES[profile.role]?.color || '#888') + '20', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: ROLES[profile.role]?.color || '#888', flexShrink: 0 }}>
+                        {profile.avatar ? <img src={profile.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(profile.name || '?')}
                       </div>
                       <span style={{ fontWeight: 600 }}>{profile.name || 'Unnamed'}</span>
                     </div>
@@ -203,28 +242,50 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Edit role modal */}
-      <Modal open={editModal} onClose={() => { setEditModal(false); setEditItem(null); }} title={editItem ? `Edit ${editItem.name}` : 'Edit user'}>
-        <FormRow label="Role">
-          <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
-            {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-          </select>
-        </FormRow>
-        <FormRow label="Status">
-          <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </FormRow>
-        {editItem && (
-          <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 8, lineHeight: 1.6 }}>
-            Email: {editItem.email}<br />
-            Joined: {new Date(editItem.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+      {/* Edit user modal */}
+      <Modal open={editModal} onClose={() => { setEditModal(false); setEditItem(null); }} title={editItem ? `Edit ${editItem.name}` : 'Edit user'} width={480}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--mut)', marginBottom: 10 }}>Profile</div>
+          <FormRow label="Display name">
+            <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder="Full name" />
+          </FormRow>
+          <FormRow label="Role">
+            <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+              {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
+          </FormRow>
+          <FormRow label="Status">
+            <select value={editForm.is_active ? 'active' : 'inactive'} onChange={e => setEditForm({ ...editForm, is_active: e.target.value === 'active' })}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive (no login)</option>
+            </select>
+          </FormRow>
+
+          <div style={{ borderTop: '1px solid var(--brd)', margin: '8px 0 14px' }} />
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--mut)', marginBottom: 10 }}>Auth credentials</div>
+
+          <FormRow label="Email address">
+            <input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} placeholder="user@example.com" />
+          </FormRow>
+          <FormRow label="New password">
+            <input type="password" value={editForm.newPassword} onChange={e => setEditForm({ ...editForm, newPassword: e.target.value })} placeholder="Leave blank to keep current" />
+          </FormRow>
+          <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 16 }}>
+            Only fill in fields you want to change. Password changes take effect immediately.
           </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          {editItem && (
+            <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
+              Joined {new Date(editItem.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
           <GhostButton onClick={() => { setEditModal(false); setEditItem(null); }}>Cancel</GhostButton>
-          {role.canManageUsers && <PrimaryButton onClick={handleSave}>Save changes</PrimaryButton>}
+          {role.canManageUsers && (
+            <PrimaryButton onClick={handleSave} disabled={editSaving}>
+              {editSaving ? 'Saving...' : 'Save changes'}
+            </PrimaryButton>
+          )}
         </div>
       </Modal>
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, ProgressBar, PageLoader } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, ProgressBar, PageLoader, ConfirmDialog } from '@/components/ui/shared';
 import { SearchInput } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { EDITORS, VIDEOGRAPHERS, PACKAGES } from '@/lib/constants';
@@ -28,6 +28,7 @@ export default function OnboardingPage() {
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
   const [editItem, setEditItem] = useState<OnboardingItem | null>(null);
   const [form, setForm] = useState(empty);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const inProgress = items.filter(i => i.status !== 'complete').length;
   const complete = items.filter(i => i.status === 'complete').length;
@@ -186,13 +187,22 @@ export default function OnboardingPage() {
         </div>
         <FormRow label="Notes"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></FormRow>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
+          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => setConfirmDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
             {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add client'}</PrimaryButton>}
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete client?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
+      />
     </div>
   );
 }

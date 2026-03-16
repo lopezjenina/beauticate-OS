@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTable, insert, update, remove, log } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
 import { useToast } from '@/components/ui/toast-provider';
-import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, PageLoader } from '@/components/ui/shared';
+import { MetricCard, ProgressBar, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, PageLoader, ConfirmDialog } from '@/components/ui/shared';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { formatPeso, formatPesoK, formatDate, pct } from '@/lib/utils';
 import { AD_STATUSES, PLATFORMS } from '@/lib/constants';
@@ -23,6 +23,7 @@ export default function AdsPage() {
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
   const [editItem, setEditItem] = useState<AdCampaign | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const filtered = campaigns.filter(c => !search || c.client_name.toLowerCase().includes(search.toLowerCase()) || c.campaign_name.toLowerCase().includes(search.toLowerCase()));
   const active = filtered.filter(c => c.status === 'active');
@@ -143,7 +144,7 @@ export default function AdsPage() {
                     <td style={{ fontSize: 12, color: 'var(--mut)' }}>{item.budget > 0 ? pct(item.spent, item.budget) + '%' : '—'}</td>
                     <td>
                       {role.canDelete && (
-                        <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
+                        <button aria-label="Delete campaign" onClick={e => { e.stopPropagation(); setConfirmDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px' }}>✕</button>
                       )}
                     </td>
                   </tr>
@@ -175,13 +176,22 @@ export default function AdsPage() {
         <FormRow label="Creative"><input value={form.creative} onChange={e => setForm({ ...form, creative: e.target.value })} /></FormRow>
         <FormRow label="Notes"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></FormRow>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
+          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => setConfirmDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
             {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add campaign'}</PrimaryButton>}
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete campaign?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
+      />
     </div>
   );
 }

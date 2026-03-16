@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useSales, useProfile, useActivityLog, useRealtime } from '@/lib/hooks';
-import { PageHeader, MetricCard, Badge, Modal, FormRow, FormGrid, PrimaryButton, GhostButton, DangerButton } from '@/components/ui';
+import { PageHeader, MetricCard, Badge, Modal, FormRow, FormGrid, PrimaryButton, GhostButton, DangerButton, ConfirmDialog } from '@/components/ui';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { SALES_STAGES, LEAD_SOURCES } from '@/lib/constants';
 import { formatPeso, formatPesoK } from '@/lib/utils';
@@ -21,6 +21,7 @@ export default function SalesPage() {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<Sale | null>(null);
   const [form, setForm] = useState({ company_name: '', contact_name: '', email: '', phone: '', deal_value: '', source: '', notes: '', stage: 'lead' });
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useRealtime('sales', reload);
 
@@ -128,7 +129,7 @@ export default function SalesPage() {
                     <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.source || '—'}</td>
                     <td>
                       {role.canDelete && (
-                        <button onClick={e => { e.stopPropagation(); handleDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}>✕</button>
+                        <button aria-label="Delete deal" onClick={e => { e.stopPropagation(); setConfirmDelete(item.id); }} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}>✕</button>
                       )}
                     </td>
                   </tr>
@@ -152,13 +153,22 @@ export default function SalesPage() {
         </FormGrid>
         <FormRow label="Notes" span><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></FormRow>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => handleDelete(editItem.id)}>Delete</DangerButton>}</div>
+          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => setConfirmDelete(editItem.id)}>Delete</DangerButton>}</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
             {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add lead'}</PrimaryButton>}
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete deal?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
+      />
     </div>
   );
 }

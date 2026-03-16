@@ -4,8 +4,8 @@ export const WEEKLY_TARGET = 86;
 
 export const ROLES: Record<string, RoleConfig> = {
   admin: { label: 'Admin', color: '#7F77DD', boards: ['dashboard', 'sales', 'onboarding', 'production', 'publishing', 'ads', 'activity', 'users', 'chat'], canEdit: true, canDelete: true, canManageUsers: true },
-  editor: { label: 'Editor', color: '#378ADD', boards: ['production', 'publishing', 'activity', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
-  social: { label: 'Social', color: '#1D9E75', boards: ['publishing', 'activity', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
+  editor: { label: 'Editor', color: '#378ADD', boards: ['production', 'publishing', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
+  social: { label: 'Social', color: '#1D9E75', boards: ['publishing', 'chat'], canEdit: true, canDelete: false, canManageUsers: false },
   viewer: { label: 'Viewer', color: '#888780', boards: ['dashboard', 'production', 'publishing', 'chat'], canEdit: false, canDelete: false, canManageUsers: false },
 };
 

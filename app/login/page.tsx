@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 type LoginMode = 'password' | 'magic';
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const supabase = createClient();
+  const router = useRouter();
 
   const clearMessages = () => { setError(''); setMessage(''); };
 
@@ -31,8 +33,12 @@ export default function LoginPage() {
     setLoading(true);
     clearMessages();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    setLoading(false);
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      router.push('/dashboard');
+    }
   };
 
   const handleMagicLink = async () => {

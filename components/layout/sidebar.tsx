@@ -23,6 +23,93 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function AccountSettingsModal({ open, onClose, profile }: {
+  open: boolean;
+  onClose: () => void;
+  profile: { id: string; name: string; email?: string | null };
+}) {
+  const [tab, setTab] = useState<'profile' | 'security'>('profile');
+  const [nameVal, setNameVal] = useState('');
+  const [emailVal, setEmailVal] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const showToast = useToast();
+  const supabase = createClient();
+
+  useEffect(() => {
+    if (open) {
+      setNameVal(profile.name);
+      setEmailVal(profile.email || '');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTab('profile');
+    }
+  }, [open]);
+
+  const saveProfile = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ name: nameVal }).eq('id', profile.id);
+      if (error) throw error;
+      showToast('Profile updated.', 'success');
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  const saveEmail = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: emailVal });
+      if (error) throw error;
+      showToast('Confirmation sent to new email.', 'info');
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  const savePassword = async () => {
+    if (newPassword !== confirmPassword) { showToast('Passwords do not match.', 'error'); return; }
+    if (newPassword.length < 8) { showToast('Password must be at least 8 characters.', 'error'); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      showToast('Password updated.', 'success');
+      setNewPassword(''); setConfirmPassword('');
+    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Account settings" width={460}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--brd)', paddingBottom: 12 }}>
+        {(['profile', 'security'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? 'rgba(127,119,221,0.12)' : 'transparent', color: tab === t ? '#7F77DD' : 'var(--mut)', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
+            {t}
+          </button>
+        ))}
+      </div>
+      {tab === 'profile' && (
+        <>
+          <FormRow label="Display name"><input value={nameVal} onChange={e => setNameVal(e.target.value)} placeholder="Your name" /></FormRow>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveProfile} disabled={loading || !nameVal.trim()}>{loading ? 'Saving...' : 'Save name'}</PrimaryButton></div>
+          <div style={{ borderTop: '1px solid var(--brd)', margin: '20px 0' }} />
+          <FormRow label="Email address"><input type="email" value={emailVal} onChange={e => setEmailVal(e.target.value)} placeholder="you@example.com" /></FormRow>
+          <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 14 }}>A confirmation link will be sent to the new email.</div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveEmail} disabled={loading || !emailVal.trim()}>{loading ? 'Sending...' : 'Update email'}</PrimaryButton></div>
+        </>
+      )}
+      {tab === 'security' && (
+        <>
+          <FormRow label="New password"><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></FormRow>
+          <FormRow label="Confirm password"><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" /></FormRow>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={savePassword} disabled={loading || !newPassword || !confirmPassword}>{loading ? 'Updating...' : 'Change password'}</PrimaryButton></div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
 export function Sidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -72,13 +159,6 @@ export function Sidebar() {
 
   // Settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'profile' | 'security'>('profile');
-  const [nameVal, setNameVal] = useState('');
-  const [emailVal, setEmailVal] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const showToast = useToast();
 
   // User menu dropdown
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -98,46 +178,8 @@ export function Sidebar() {
   }, []);
 
   const openSettings = () => {
-    setNameVal(profile?.name || '');
-    setEmailVal(profile?.email || '');
-    setNewPassword(''); setConfirmPassword('');
-    setSettingsTab('profile');
     setSettingsOpen(true);
     setUserMenuOpen(false);
-  };
-
-  const saveProfile = async () => {
-    if (!profile) return;
-    setSettingsLoading(true);
-    try {
-      const { error } = await supabase.from('profiles').update({ name: nameVal }).eq('id', profile.id);
-      if (error) throw error;
-      showToast('Profile updated.', 'success');
-    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
-    finally { setSettingsLoading(false); }
-  };
-
-  const saveEmail = async () => {
-    setSettingsLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ email: emailVal });
-      if (error) throw error;
-      showToast('Confirmation sent to new email.', 'info');
-    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
-    finally { setSettingsLoading(false); }
-  };
-
-  const savePassword = async () => {
-    if (newPassword !== confirmPassword) { showToast('Passwords do not match.', 'error'); return; }
-    if (newPassword.length < 8) { showToast('Password must be at least 8 characters.', 'error'); return; }
-    setSettingsLoading(true);
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
-      showToast('Password updated.', 'success');
-      setNewPassword(''); setConfirmPassword('');
-    } catch (e: any) { showToast(e.message || 'Update failed.', 'error'); }
-    finally { setSettingsLoading(false); }
   };
 
   const role = profile ? ROLES[profile.role] || ROLES.viewer : ROLES.viewer;
@@ -304,36 +346,6 @@ export function Sidebar() {
     </>
   );
 
-  // ── Settings modal (shared) ─────────────────────────────
-  const SettingsModal = () => (
-    <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Account settings" width={460}>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--brd)', paddingBottom: 12 }}>
-        {(['profile', 'security'] as const).map(tab => (
-          <button key={tab} onClick={() => setSettingsTab(tab)} style={{ background: settingsTab === tab ? 'rgba(127,119,221,0.12)' : 'transparent', color: settingsTab === tab ? '#7F77DD' : 'var(--mut)', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
-            {tab}
-          </button>
-        ))}
-      </div>
-      {settingsTab === 'profile' && (
-        <>
-          <FormRow label="Display name"><input value={nameVal} onChange={e => setNameVal(e.target.value)} placeholder="Your name" /></FormRow>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveProfile} disabled={settingsLoading || !nameVal.trim()}>{settingsLoading ? 'Saving...' : 'Save name'}</PrimaryButton></div>
-          <div style={{ borderTop: '1px solid var(--brd)', margin: '20px 0' }} />
-          <FormRow label="Email address"><input type="email" value={emailVal} onChange={e => setEmailVal(e.target.value)} placeholder="you@example.com" /></FormRow>
-          <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 14 }}>A confirmation link will be sent to the new email.</div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={saveEmail} disabled={settingsLoading || !emailVal.trim()}>{settingsLoading ? 'Sending...' : 'Update email'}</PrimaryButton></div>
-        </>
-      )}
-      {settingsTab === 'security' && (
-        <>
-          <FormRow label="New password"><input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></FormRow>
-          <FormRow label="Confirm password"><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" /></FormRow>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}><PrimaryButton onClick={savePassword} disabled={settingsLoading || !newPassword || !confirmPassword}>{settingsLoading ? 'Updating...' : 'Change password'}</PrimaryButton></div>
-        </>
-      )}
-    </Modal>
-  );
-
   // ── MOBILE layout ───────────────────────────────────────
   if (isMobile) {
     return (
@@ -387,7 +399,7 @@ export function Sidebar() {
         </div>
 
         {userMenuOpen && UserDropdown()}
-        {SettingsModal()}
+        <AccountSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} profile={profile} />
       </>
     );
   }
@@ -437,7 +449,7 @@ export function Sidebar() {
       </div>
 
       {userMenuOpen && UserDropdown()}
-      {SettingsModal()}
+      <AccountSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} profile={profile} />
     </>
   );
 }

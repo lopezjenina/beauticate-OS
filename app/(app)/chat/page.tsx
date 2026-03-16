@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { supabase } from '@/lib/hooks';
 import { ROLES } from '@/lib/constants';
@@ -50,39 +50,312 @@ function MessageContent({ content, isOwn }: { content: string; isOwn: boolean })
   );
 }
 
+const ChatMessageInput = memo(function ChatMessageInput({
+  selectedId,
+  selectedChannelName,
+  userId,
+  userName,
+  userEmail,
+  userAvatar,
+  profiles,
+  isMobile,
+  onScrollBottom,
+}: {
+  selectedId: string | null;
+  selectedChannelName: string;
+  userId: string;
+  userName: string | null | undefined;
+  userEmail: string | null | undefined;
+  userAvatar: string | null | undefined;
+  profiles: Profile[];
+  isMobile: boolean;
+  onScrollBottom: () => void;
+}) {
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [mentionSuggestions, setMentionSuggestions] = useState<Profile[]>([]);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertMention = useCallback((profile: Profile) => {
+    const cursor = inputRef.current?.selectionStart ?? input.length;
+    const textBefore = input.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+    if (!match) return;
+    const start = cursor - match[0].length;
+    const newInput = input.slice(0, start) + `@${profile.name} ` + input.slice(cursor);
+    setInput(newInput);
+    setMentionSuggestions([]);
+    setTimeout(() => {
+      if (inputRef.current) {
+        const pos = start + profile.name.length + 2;
+        inputRef.current.selectionStart = pos;
+        inputRef.current.selectionEnd = pos;
+        inputRef.current.focus();
+      }
+    }, 0);
+  }, [input]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    const cursor = e.target.selectionStart ?? val.length;
+    const textBefore = val.slice(0, cursor);
+    const match = textBefore.match(/@(\w*)$/);
+    if (match) {
+      const query = match[1].toLowerCase();
+      setMentionSuggestions(profiles.filter(p => p.id !== userId && p.name.toLowerCase().includes(query)).slice(0, 6));
+      setMentionIdx(0);
+    } else {
+      setMentionSuggestions([]);
+    }
+  };
+
+  const send = async () => {
+    const content = input.trim();
+    if (!content || !userId || sending || !selectedId) return;
+    setSending(true);
+    setInput('');
+    setMentionSuggestions([]);
+    onScrollBottom();
+    const { data: saved, error } = await supabase
+      .from('messages')
+      .insert({ channel_id: selectedId, user_id: userId, user_name: userName || userEmail || 'Unknown', user_avatar: userAvatar || null, content })
+      .select().single();
+    if (error) {
+      setInput(content);
+    } else if (saved) {
+      const pattern = /@([\w]+(?:\s[\w]+)*)/g;
+      const names = [...content.matchAll(pattern)].map(m => m[1].toLowerCase());
+      const mentionedIds = profiles.filter(p => names.some(n => p.name.toLowerCase() === n) && p.id !== userId).map(p => p.id);
+      for (const mid of mentionedIds) {
+        await supabase.from('notifications').insert({
+          user_id: mid, type: 'mention',
+          title: `${userName || 'Someone'} mentioned you`,
+          body: content.slice(0, 120), link: `/chat`,
+          actor_id: userId, actor_name: userName || 'Unknown',
+        });
+      }
+    }
+    setSending(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => Math.min(i + 1, mentionSuggestions.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && mentionSuggestions[mentionIdx])) { e.preventDefault(); insertMention(mentionSuggestions[mentionIdx]); return; }
+      if (e.key === 'Escape') { setMentionSuggestions([]); return; }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
+  return (
+    <div style={{ flexShrink: 0, borderTop: '1px solid var(--brd)', padding: isMobile ? '10px 12px 12px' : '12px 20px 16px', background: 'var(--bg-1)' }}>
+      <div style={{ position: 'relative' }}>
+        {mentionSuggestions.length > 0 && (
+          <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: isMobile ? 0 : 52, background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 100 }}>
+            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Mention someone</div>
+            {mentionSuggestions.map((p, i) => {
+              const rc = ROLES[p.role];
+              return (
+                <button key={p.id} onMouseDown={e => { e.preventDefault(); insertMention(p); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', background: i === mentionIdx ? 'rgba(127,119,221,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', flex: 1 }}>{p.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: rc?.color || '#888', background: (rc?.color || '#888') + '15', padding: '2px 8px', borderRadius: 4 }}>{rc?.label || p.role}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 12, padding: '4px 4px 4px 14px', transition: 'border-color 0.15s' }}>
+          <textarea ref={inputRef} value={input} onChange={handleInputChange} onKeyDown={handleKey}
+            placeholder={`Message #${selectedChannelName || '...'}`}
+            disabled={sending || !selectedId} rows={1}
+            style={{ flex: 1, resize: 'none', minHeight: 36, maxHeight: 120, background: 'transparent', border: 'none', color: 'var(--fg)', fontSize: 13.5, fontFamily: 'inherit', outline: 'none', lineHeight: 1.5, padding: '6px 0' }}
+            onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }}
+            onFocus={e => { e.currentTarget.parentElement!.style.borderColor = 'rgba(127,119,221,0.45)'; }}
+            onBlur={e => { e.currentTarget.parentElement!.style.borderColor = 'var(--brd)'; }}
+          />
+          <button onClick={send} disabled={!input.trim() || sending || !selectedId}
+            style={{ background: input.trim() && !sending ? 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)' : 'rgba(255,255,255,0.05)', color: input.trim() && !sending ? '#fff' : 'var(--mut)', border: 'none', borderRadius: 9, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !sending ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}
+            aria-label="Send message">
+            {sending ? <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} /> : <Send size={15} />}
+          </button>
+        </div>
+        {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 5 }}>Enter to send · Shift+Enter for new line · @ to mention</div>}
+      </div>
+    </div>
+  );
+});
+
+function NewChannelFormPanel({ onClose, onCreate, profiles }: {
+  onClose: () => void;
+  onCreate: (name: string, desc: string, roles: string[]) => void;
+  profiles: Profile[];
+}) {
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const [roles, setRoles] = useState<string[]>(['admin', 'editor', 'social', 'viewer']);
+  const ROLE_OPTS = ['admin', 'editor', 'social', 'viewer'];
+
+  const handleCreate = () => {
+    if (!name.trim()) return;
+    onCreate(name, desc, roles);
+    setName(''); setDesc(''); setRoles(['admin', 'editor', 'social', 'viewer']);
+  };
+
+  return (
+    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg)' }}>New Channel</span>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 5, borderRadius: 5, display: 'flex' }}><X size={13} /></button>
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Name</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. design" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</label>
+        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Who can access</label>
+        {ROLE_OPTS.map(r => {
+          const rc = ROLES[r];
+          const members = profiles.filter(p => p.role === r);
+          return (
+            <label key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, marginBottom: 8, cursor: 'pointer', padding: '6px 8px', borderRadius: 6, background: roles.includes(r) ? 'rgba(127,119,221,0.06)' : 'transparent', border: `1px solid ${roles.includes(r) ? 'rgba(127,119,221,0.2)' : 'transparent'}`, transition: 'all 0.12s' }}>
+              <input type="checkbox" checked={roles.includes(r)} onChange={e => setRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))} style={{ accentColor: '#7F77DD', marginTop: 2 }} />
+              <div>
+                <span style={{ fontWeight: 700, color: rc?.color || 'var(--fg)' }}>{rc?.label || r}</span>
+                {members.length > 0 && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{members.map(m => m.name).join(', ')}</div>}
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
+        <button onClick={handleCreate} disabled={!name.trim()} style={{ flex: 1, padding: '9px 0', background: 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: name.trim() ? 'pointer' : 'not-allowed', opacity: name.trim() ? 1 : 0.5 }}>Create</button>
+        <button onClick={onClose} style={{ flex: 1, padding: '9px 0', background: 'var(--bg-2)', color: 'var(--mut)', border: '1px solid var(--brd)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function ChannelEditFormPanel({ ch, profiles, onClose, onSaved, onDeleteRequest }: {
+  ch: Channel;
+  profiles: Profile[];
+  onClose: () => void;
+  onSaved: (updated: Channel) => void;
+  onDeleteRequest: (ch: Channel) => void;
+}) {
+  const [editForm, setEditForm] = useState({ name: ch.name, description: ch.description || '', allowed_roles: [...ch.allowed_roles] });
+  const [saving, setSaving] = useState(false);
+  const ROLE_OPTS = ['admin', 'editor', 'social', 'viewer'];
+
+  useEffect(() => {
+    setEditForm({ name: ch.name, description: ch.description || '', allowed_roles: [...ch.allowed_roles] });
+  }, [ch.id]);
+
+  const toggleRole = (r: string) => setEditForm(prev => ({
+    ...prev,
+    allowed_roles: prev.allowed_roles.includes(r) ? prev.allowed_roles.filter(x => x !== r) : [...prev.allowed_roles, r],
+  }));
+
+  const save = async () => {
+    if (!editForm.name.trim()) return;
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('channels')
+      .update({ name: editForm.name.trim(), description: editForm.description.trim(), allowed_roles: editForm.allowed_roles })
+      .eq('id', ch.id)
+      .select().single();
+    if (!error && data) onSaved(data as Channel);
+    setSaving(false);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--brd)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Channel settings</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', marginTop: 1 }}>#{ch.name}</div>
+        </div>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6, borderRadius: 6, display: 'flex' }}><X size={13} /></button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Channel name</label>
+          <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</label>
+          <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Who can access</label>
+          {ROLE_OPTS.map(r => {
+            const rc = ROLES[r];
+            const members = profiles.filter(p => p.role === r);
+            const hasAccess = editForm.allowed_roles.includes(r);
+            return (
+              <div key={r} style={{ marginBottom: 8, padding: '8px 10px', background: hasAccess ? 'rgba(127,119,221,0.07)' : 'rgba(255,255,255,0.02)', border: `1px solid ${hasAccess ? 'rgba(127,119,221,0.25)' : 'var(--brd)'}`, borderRadius: 8, transition: 'all 0.12s' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={hasAccess} onChange={() => toggleRole(r)} style={{ accentColor: '#7F77DD' }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: rc?.color || 'var(--fg)', flex: 1 }}>{rc?.label || r}</span>
+                  <span style={{ fontSize: 11, color: 'var(--mut)', background: 'rgba(255,255,255,0.05)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>{members.length}</span>
+                </label>
+                {members.length > 0 && (
+                  <div style={{ marginTop: 6, paddingLeft: 24, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {members.map(m => (
+                      <span key={m.id} style={{ fontSize: 11, color: hasAccess ? 'var(--fg)' : 'var(--mut)', background: 'rgba(255,255,255,0.05)', padding: '2px 7px', borderRadius: 10 }}>{m.name}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={save} disabled={saving || !editForm.name.trim()}
+          style={{ width: '100%', padding: '9px 0', background: 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
+        {!ch.is_default && (
+          <button onClick={() => onDeleteRequest(ch)}
+            style={{ width: '100%', padding: '9px 0', background: 'rgba(248,113,113,0.06)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Trash2 size={13} /> Delete channel
+          </button>
+        )}
+        {ch.is_default && <p style={{ fontSize: 11, color: 'var(--mut)', textAlign: 'center', margin: 0 }}>Default channels cannot be deleted.</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const { user, role } = useAuth();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [loadingChannels, setLoadingChannels] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [newChannelOpen, setNewChannelOpen] = useState(false);
-  const [newChannelName, setNewChannelName] = useState('');
-  const [newChannelDesc, setNewChannelDesc] = useState('');
-  const [newChannelRoles, setNewChannelRoles] = useState<string[]>(['admin', 'editor', 'social', 'viewer']);
   const [showMembers, setShowMembers] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
   // Channel editing
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', description: '', allowed_roles: [] as string[] });
-  const [editSaving, setEditSaving] = useState(false);
   const [confirmDeleteChannel, setConfirmDeleteChannel] = useState<Channel | null>(null);
 
   // Mobile: track which panel is visible
   const [isMobile, setIsMobile] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'channels' | 'chat'>('channels');
 
-  // @mention autocomplete
-  const [mentionSuggestions, setMentionSuggestions] = useState<Profile[]>([]);
-  const [mentionIdx, setMentionIdx] = useState(0);
-
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = useCallback((smooth = false) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' });
@@ -173,135 +446,27 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(presenceCh); };
   }, [user?.id]);
 
-  const parseMentions = useCallback((content: string): string[] => {
-    const pattern = /@([\w]+(?:\s[\w]+)*)/g;
-    const names = [...content.matchAll(pattern)].map(m => m[1].toLowerCase());
-    return profiles
-      .filter(p => names.some(n => p.name.toLowerCase() === n) && p.id !== user?.id)
-      .map(p => p.id);
-  }, [profiles, user?.id]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setInput(val);
-    const cursor = e.target.selectionStart ?? val.length;
-    const textBefore = val.slice(0, cursor);
-    const match = textBefore.match(/@(\w*)$/);
-    if (match) {
-      const query = match[1].toLowerCase();
-      const filtered = profiles.filter(p => p.id !== user?.id && p.name.toLowerCase().includes(query)).slice(0, 6);
-      setMentionSuggestions(filtered);
-      setMentionIdx(0);
-    } else {
-      setMentionSuggestions([]);
-    }
-  };
-
-  const insertMention = useCallback((profile: Profile) => {
-    const cursor = inputRef.current?.selectionStart ?? input.length;
-    const textBefore = input.slice(0, cursor);
-    const match = textBefore.match(/@(\w*)$/);
-    if (!match) return;
-    const start = cursor - match[0].length;
-    const newInput = input.slice(0, start) + `@${profile.name} ` + input.slice(cursor);
-    setInput(newInput);
-    setMentionSuggestions([]);
-    setTimeout(() => {
-      if (inputRef.current) {
-        const pos = start + profile.name.length + 2;
-        inputRef.current.selectionStart = pos;
-        inputRef.current.selectionEnd = pos;
-        inputRef.current.focus();
-      }
-    }, 0);
-  }, [input]);
-
-  const send = async () => {
-    const content = input.trim();
-    if (!content || !user || sending || !selectedId) return;
-    setSending(true);
-    setInput('');
-    setMentionSuggestions([]);
-    const tempId = `temp_${Date.now()}`;
-    const optimistic: Message = {
-      id: tempId, channel_id: selectedId,
-      user_id: user.id, user_name: user.name || user.email || 'You',
-      user_avatar: user.avatar || null, content,
-      created_at: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic]);
-    setTimeout(() => scrollToBottom(true), 50);
-    const { data: saved, error } = await supabase
-      .from('messages')
-      .insert({ channel_id: selectedId, user_id: user.id, user_name: user.name || user.email || 'Unknown', user_avatar: user.avatar || null, content })
-      .select().single();
-    if (error) {
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setInput(content);
-    } else if (saved) {
-      setMessages(prev => prev.map(m => m.id === tempId ? saved as Message : m));
-      const mentionedIds = parseMentions(content);
-      for (const mentionedUserId of mentionedIds) {
-        await supabase.from('notifications').insert({
-          user_id: mentionedUserId, type: 'mention',
-          title: `${user.name || 'Someone'} mentioned you`,
-          body: content.slice(0, 120),
-          link: `/chat`,
-          actor_id: user.id, actor_name: user.name || 'Unknown',
-        });
-      }
-    }
-    setSending(false);
-    inputRef.current?.focus();
-  };
-
-  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (mentionSuggestions.length > 0) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIdx(i => Math.min(i + 1, mentionSuggestions.length - 1)); return; }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return; }
-      if (e.key === 'Tab' || (e.key === 'Enter' && mentionSuggestions[mentionIdx])) {
-        e.preventDefault(); insertMention(mentionSuggestions[mentionIdx]); return;
-      }
-      if (e.key === 'Escape') { setMentionSuggestions([]); return; }
-    }
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-  };
-
-  const createChannel = async () => {
-    if (!newChannelName.trim()) return;
-    const slug = newChannelName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const handleCreateChannel = async (name: string, desc: string, roles: string[]) => {
+    const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     const { data, error } = await supabase
       .from('channels')
-      .insert({ name: newChannelName.trim(), slug, description: newChannelDesc.trim(), allowed_roles: newChannelRoles, created_by: user?.id })
+      .insert({ name: name.trim(), slug, description: desc.trim(), allowed_roles: roles, created_by: user?.id })
       .select().single();
     if (!error && data) {
       setChannels(prev => [...prev, data as Channel]);
       setSelectedId((data as Channel).id);
       setNewChannelOpen(false);
-      setNewChannelName(''); setNewChannelDesc('');
-      setNewChannelRoles(['admin', 'editor', 'social', 'viewer']);
     }
   };
 
   const openEditChannel = (ch: Channel) => {
-    setEditForm({ name: ch.name, description: ch.description || '', allowed_roles: [...ch.allowed_roles] });
     setEditingChannel(ch);
     setNewChannelOpen(false);
   };
 
-  const updateChannel = async () => {
-    if (!editingChannel || !editForm.name.trim()) return;
-    setEditSaving(true);
-    const { data, error } = await supabase
-      .from('channels')
-      .update({ name: editForm.name.trim(), description: editForm.description.trim(), allowed_roles: editForm.allowed_roles })
-      .eq('id', editingChannel.id)
-      .select().single();
-    if (!error && data) {
-      setChannels(prev => prev.map(c => c.id === editingChannel.id ? data as Channel : c));
-      setEditingChannel(data as Channel);
-    }
-    setEditSaving(false);
+  const handleChannelSaved = (updated: Channel) => {
+    setChannels(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setEditingChannel(updated);
   };
 
   const deleteChannel = async (ch: Channel) => {
@@ -315,15 +480,6 @@ export default function ChatPage() {
       setEditingChannel(null);
       setConfirmDeleteChannel(null);
     }
-  };
-
-  const toggleRole = (r: string) => {
-    setEditForm(prev => ({
-      ...prev,
-      allowed_roles: prev.allowed_roles.includes(r)
-        ? prev.allowed_roles.filter(x => x !== r)
-        : [...prev.allowed_roles, r],
-    }));
   };
 
   const selectChannel = (id: string) => {
@@ -343,8 +499,6 @@ export default function ChatPage() {
     profiles.filter(p => selectedChannel?.allowed_roles?.includes(p.role)),
     [profiles, selectedChannel]
   );
-
-  const ROLE_OPTIONS = ['admin', 'editor', 'social', 'viewer'];
 
   if (loadingChannels) {
     return <div style={{ padding: 40, color: 'var(--mut)', fontSize: 13 }}>Loading channels...</div>;
@@ -584,71 +738,17 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid var(--brd)', padding: isMobile ? '10px 12px 12px' : '12px 20px 16px', background: 'var(--bg-1)' }}>
-        <div style={{ position: 'relative' }}>
-          {/* @mention popover */}
-          {mentionSuggestions.length > 0 && (
-            <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: isMobile ? 0 : 52, background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 100 }}>
-              <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Mention someone</div>
-              {mentionSuggestions.map((p, i) => {
-                const rc = ROLES[p.role];
-                return (
-                  <button
-                    key={p.id}
-                    onMouseDown={e => { e.preventDefault(); insertMention(p); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', background: i === mentionIdx ? 'rgba(127,119,221,0.1)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', flex: 1 }}>{p.name}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: rc?.color || '#888', background: (rc?.color || '#888') + '15', padding: '2px 8px', borderRadius: 4 }}>{rc?.label || p.role}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Input row */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 12, padding: '4px 4px 4px 14px', transition: 'border-color 0.15s' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKey}
-              placeholder={`Message #${selectedChannel?.name || '...'}`}
-              disabled={sending || !selectedId}
-              rows={1}
-              style={{
-                flex: 1, resize: 'none', minHeight: 36, maxHeight: 120,
-                background: 'transparent', border: 'none',
-                color: 'var(--fg)', fontSize: 13.5, fontFamily: 'inherit',
-                outline: 'none', lineHeight: 1.5, padding: '6px 0',
-              }}
-              onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }}
-              onFocus={e => { e.currentTarget.parentElement!.style.borderColor = 'rgba(127,119,221,0.45)'; }}
-              onBlur={e => { e.currentTarget.parentElement!.style.borderColor = 'var(--brd)'; }}
-            />
-            <button
-              onClick={send}
-              disabled={!input.trim() || sending || !selectedId}
-              style={{
-                background: input.trim() && !sending ? 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)' : 'rgba(255,255,255,0.05)',
-                color: input.trim() && !sending ? '#fff' : 'var(--mut)',
-                border: 'none', borderRadius: 9,
-                width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: input.trim() && !sending ? 'pointer' : 'not-allowed',
-                transition: 'all 0.15s', flexShrink: 0,
-              }}
-              aria-label="Send message"
-            >
-              {sending ? <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} /> : <Send size={15} />}
-            </button>
-          </div>
-          {!isMobile && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 5 }}>Enter to send · Shift+Enter for new line · @ to mention</div>
-          )}
-        </div>
-      </div>
+      <ChatMessageInput
+        selectedId={selectedId}
+        selectedChannelName={selectedChannel?.name || ''}
+        userId={user?.id || ''}
+        userName={user?.name}
+        userEmail={user?.email}
+        userAvatar={user?.avatar}
+        profiles={profiles}
+        isMobile={isMobile}
+        onScrollBottom={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+      />
     </div>
   );
 
@@ -662,12 +762,12 @@ export default function ChatPage() {
             {ChannelList()}
             {editingChannel && (
               <div style={{ borderTop: '1px solid var(--brd)' }}>
-                {ChannelEditPanel({ ch: editingChannel, onClose: () => setEditingChannel(null) })}
+                <ChannelEditFormPanel ch={editingChannel} profiles={profiles} onClose={() => setEditingChannel(null)} onSaved={handleChannelSaved} onDeleteRequest={setConfirmDeleteChannel} />
               </div>
             )}
             {newChannelOpen && !editingChannel && role?.canManageUsers && (
               <div style={{ borderTop: '1px solid var(--brd)' }}>
-                {NewChannelForm({ onClose: () => setNewChannelOpen(false) })}
+                <NewChannelFormPanel onClose={() => setNewChannelOpen(false)} onCreate={handleCreateChannel} profiles={profiles} />
               </div>
             )}
           </div>
@@ -693,9 +793,9 @@ export default function ChatPage() {
       {/* Right panel */}
       <div style={{ width: 240, flexShrink: 0, borderLeft: '1px solid var(--brd)', display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--bg-1)' }}>
         {editingChannel ? (
-          ChannelEditPanel({ ch: editingChannel, onClose: () => setEditingChannel(null) })
+          <ChannelEditFormPanel ch={editingChannel} profiles={profiles} onClose={() => setEditingChannel(null)} onSaved={handleChannelSaved} onDeleteRequest={setConfirmDeleteChannel} />
         ) : newChannelOpen && role?.canManageUsers ? (
-          NewChannelForm({ onClose: () => setNewChannelOpen(false) })
+          <NewChannelFormPanel onClose={() => setNewChannelOpen(false)} onCreate={handleCreateChannel} profiles={profiles} />
         ) : (
           MembersPanel()
         )}
@@ -765,110 +865,4 @@ export default function ChatPage() {
     );
   }
 
-  function NewChannelForm({ onClose }: { onClose: () => void }) {
-    return (
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--fg)' }}>New Channel</span>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 5, borderRadius: 5, display: 'flex' }}><X size={13} /></button>
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Name</label>
-          <input value={newChannelName} onChange={e => setNewChannelName(e.target.value)} placeholder="e.g. design" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</label>
-          <input value={newChannelDesc} onChange={e => setNewChannelDesc(e.target.value)} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
-        </div>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 600, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Who can access</label>
-          {ROLE_OPTIONS.map(r => {
-            const rc = ROLES[r];
-            const members = profiles.filter(p => p.role === r);
-            return (
-              <label key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, marginBottom: 8, cursor: 'pointer', padding: '6px 8px', borderRadius: 6, background: newChannelRoles.includes(r) ? 'rgba(127,119,221,0.06)' : 'transparent', border: `1px solid ${newChannelRoles.includes(r) ? 'rgba(127,119,221,0.2)' : 'transparent'}`, transition: 'all 0.12s' }}>
-                <input type="checkbox" checked={newChannelRoles.includes(r)}
-                  onChange={e => setNewChannelRoles(prev => e.target.checked ? [...prev, r] : prev.filter(x => x !== r))}
-                  style={{ accentColor: '#7F77DD', marginTop: 2 }} />
-                <div>
-                  <span style={{ fontWeight: 700, color: rc?.color || 'var(--fg)' }}>{rc?.label || r}</span>
-                  {members.length > 0 && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>{members.map(m => m.name).join(', ')}</div>}
-                </div>
-              </label>
-            );
-          })}
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-          <button onClick={createChannel} disabled={!newChannelName.trim()} style={{ flex: 1, padding: '9px 0', background: 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: newChannelName.trim() ? 'pointer' : 'not-allowed', opacity: newChannelName.trim() ? 1 : 0.5 }}>Create</button>
-          <button onClick={onClose} style={{ flex: 1, padding: '9px 0', background: 'var(--bg-2)', color: 'var(--mut)', border: '1px solid var(--brd)', borderRadius: 7, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  function ChannelEditPanel({ ch, onClose }: { ch: Channel; onClose: () => void }) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--brd)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--mut)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Channel settings</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', marginTop: 1 }}>#{ch.name}</div>
-          </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6, borderRadius: 6, display: 'flex' }}><X size={13} /></button>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Channel name</label>
-            <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</label>
-            <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} placeholder="What's this channel for?" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-0)', border: '1px solid var(--brd)', borderRadius: 7, color: 'var(--fg)', fontSize: 13 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--mut)', fontWeight: 700, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Who can access</label>
-            {ROLE_OPTIONS.map(r => {
-              const rc = ROLES[r];
-              const members = profiles.filter(p => p.role === r);
-              const hasAccess = editForm.allowed_roles.includes(r);
-              return (
-                <div key={r} style={{ marginBottom: 8, padding: '8px 10px', background: hasAccess ? 'rgba(127,119,221,0.07)' : 'rgba(255,255,255,0.02)', border: `1px solid ${hasAccess ? 'rgba(127,119,221,0.25)' : 'var(--brd)'}`, borderRadius: 8, transition: 'all 0.12s' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={hasAccess} onChange={() => toggleRole(r)} style={{ accentColor: '#7F77DD' }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: rc?.color || 'var(--fg)', flex: 1 }}>{rc?.label || r}</span>
-                    <span style={{ fontSize: 11, color: 'var(--mut)', background: 'rgba(255,255,255,0.05)', padding: '1px 7px', borderRadius: 4, fontWeight: 600 }}>{members.length}</span>
-                  </label>
-                  {members.length > 0 && (
-                    <div style={{ marginTop: 6, paddingLeft: 24, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {members.map(m => (
-                        <span key={m.id} style={{ fontSize: 11, color: hasAccess ? 'var(--fg)' : 'var(--mut)', background: 'rgba(255,255,255,0.05)', padding: '2px 7px', borderRadius: 10 }}>{m.name}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <button
-            onClick={updateChannel}
-            disabled={editSaving || !editForm.name.trim()}
-            style={{ width: '100%', padding: '9px 0', background: 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', opacity: editSaving ? 0.6 : 1 }}
-          >
-            {editSaving ? 'Saving...' : 'Save changes'}
-          </button>
-          {!ch.is_default && (
-            <button
-              onClick={() => setConfirmDeleteChannel(ch)}
-              style={{ width: '100%', padding: '9px 0', background: 'rgba(248,113,113,0.06)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-            >
-              <Trash2 size={13} /> Delete channel
-            </button>
-          )}
-          {ch.is_default && (
-            <p style={{ fontSize: 11, color: 'var(--mut)', textAlign: 'center', margin: 0 }}>Default channels cannot be deleted.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
 }

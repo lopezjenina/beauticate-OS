@@ -374,6 +374,9 @@ export default function ChatPage() {
 
   // Load channels + profiles
   useEffect(() => {
+    // Mark chat as visited so sidebar clears the unread badge
+    localStorage.setItem('vv_last_chat_visit', new Date().toISOString());
+
     const load = async () => {
       const [{ data: chs }, { data: profs }] = await Promise.all([
         supabase.from('channels').select('*').order('position', { ascending: true }),

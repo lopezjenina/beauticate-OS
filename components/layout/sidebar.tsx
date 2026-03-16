@@ -153,13 +153,43 @@ export function Sidebar() {
           setUnreadBoards(prev => ({ ...prev, [board]: (prev[board] || 0) + 1 }));
         }
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        // Badge the Channels nav item when a new message arrives and user isn't on chat
-        if (currentBoard !== 'chat') {
-          setUnreadBoards(prev => ({ ...prev, chat: (prev.chat || 0) + 1 }));
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentBoard]);
+
+  // Unread chat messages badge — localStorage timestamp approach
+  useEffect(() => {
+    const supabase = createClient();
+    const LAST_VISIT_KEY = 'vv_last_chat_visit';
+
+    if (currentBoard === 'chat') {
+      // Mark as visited now
+      localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+      setUnreadBoards(prev => { const next = { ...prev }; delete next.chat; return next; });
+      return;
+    }
+
+    const lastVisit = localStorage.getItem(LAST_VISIT_KEY) ?? new Date(0).toISOString();
+
+    // Initial count of messages since last visit
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .gt('created_at', lastVisit)
+      .then(({ count }) => {
+        if (count && count > 0) {
+          setUnreadBoards(prev => ({ ...prev, chat: count }));
         }
+      });
+
+    // Realtime increment for new messages while away from chat
+    const ch = supabase
+      .channel('sidebar_messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        setUnreadBoards(prev => ({ ...prev, chat: (prev.chat || 0) + 1 }));
       })
       .subscribe();
+
     return () => { supabase.removeChannel(ch); };
   }, [currentBoard]);
 

@@ -47,9 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let initialized = false;
 
-    const syncUser = async () => {
-      setLoading(true);
+    const syncUser = async (showLoading = false) => {
+      if (showLoading) setLoading(true);
 
       const {
         data: { session },
@@ -73,12 +74,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setLoading(false);
+      initialized = true;
     };
 
-    syncUser();
+    syncUser(true);
 
     const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      syncUser();
+      // Don't show loading spinner on token refresh / tab focus — only on actual sign-in/out
+      syncUser(false);
     });
 
     return () => {

@@ -28,7 +28,7 @@ export function useTable<T>(table: string, orderBy?: string) {
     return () => { supabase.removeChannel(ch); };
   }, [table, fetch]);
 
-  return { data, loading, refetch: fetch };
+  return { data, setData, loading, refetch: fetch };
 }
 
 export async function insert(table: string, row: any) {
@@ -98,7 +98,7 @@ export function useRealtime(table: string, onChange: () => void) {
 }
 
 export function useSales() {
-  const { data: sales, loading, refetch } = useTable<Sale>('sales', 'created_at');
+  const { data: sales, setData: setSales, loading, refetch } = useTable<Sale>('sales', 'created_at');
 
   const upsert = useCallback(async (item: any) => {
     const payload = { ...item };
@@ -114,8 +114,10 @@ export function useSales() {
   }, []);
 
   const updateStage = useCallback(async (id: string, stage: string) => {
+    // Optimistic update — move the card immediately in UI
+    setSales(prev => prev.map(s => s.id === id ? { ...s, stage: stage as Sale['stage'] } : s));
     await update('sales', id, { stage });
-  }, []);
+  }, [setSales]);
 
   return { sales, loading, reload: refetch, upsert, remove: removeSale, updateStage };
 }

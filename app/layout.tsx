@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
@@ -12,18 +13,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body suppressHydrationWarning>
-        <head>
-  ...
-  {(process.env.NODE_ENV === "development" || process.env.VERCEL_ENV === "preview") && (
-    // eslint-disable-next-line @next/next/no-sync-scripts
-    <script
-      data-recording-token="5KQmcxT9O4PB7MZb4CYxpMZaWhxrsWHY3xQniYpZ"
-      data-is-production-environment="false"
-      src="https://snippet.meticulous.ai/v1/meticulous.js"
-    />
-  )}
-  ...
-</head>
+        {(process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'preview') && (
+          <Script
+            src="https://snippet.meticulous.ai/v1/meticulous.js"
+            data-recording-token="5KQmcxT9O4PB7MZb4CYxpMZaWhxrsWHY3xQniYpZ"
+            data-is-production-environment="false"
+          />
+        )}
         {children}
         <SpeedInsights />
         <Analytics />

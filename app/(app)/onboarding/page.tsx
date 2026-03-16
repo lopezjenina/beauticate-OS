@@ -114,7 +114,7 @@ export default function OnboardingPage() {
         <MetricCard label="Checklist" value={totalChecks > 0 ? Math.round((doneChecks / totalChecks) * 100) + '%' : '—'} />
       </div>
 
-      <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
+      <div className="table-wrap" style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
         <table>
           <thead>
             <tr>

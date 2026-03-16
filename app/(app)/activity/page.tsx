@@ -79,7 +79,7 @@ export default function ActivityPage() {
       {groups.map(group => (
         <div key={group.label} style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--mut)', marginBottom: 8, paddingLeft: 4 }}>{group.label}</div>
-          <div style={{ background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+          <div className="table-wrap" style={{ background: 'var(--bg-2)', borderRadius: 12, border: '1px solid var(--brd)', overflow: 'hidden' }}>
             {group.items.map((entry, i) => (
               <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: i < group.items.length - 1 ? '1px solid var(--brd)' : 'none' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: LOG_COLORS[entry.log_type] || '#378ADD', flexShrink: 0 }} />

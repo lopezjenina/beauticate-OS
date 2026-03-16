@@ -88,7 +88,7 @@ export default function ProductionPage() {
   };
 
   const ClientTable = ({ rows, showEditorCol = true }: { rows: Client[]; showEditorCol?: boolean }) => (
-    <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+    <div className="table-wrap wide" style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
       <table style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr>
@@ -106,7 +106,7 @@ export default function ProductionPage() {
             const canEdit = canEditClient(client);
             const ec = editorColor(client.editor);
             return (
-              <tr key={client.id} className="prod-row" style={{ opacity: !role.canManageUsers && !canEdit ? 0.7 : 1 }}>
+              <tr key={client.id} className={`prod-row${canEdit ? ' editable' : ''}`} style={{ opacity: !role.canManageUsers && !canEdit ? 0.55 : 1 }} onClick={() => { if (canEdit) openEdit(client); }}>
                 <td>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{client.name}</div>
                   {client.package_type && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 1 }}>{client.package_type}</div>}
@@ -135,9 +135,9 @@ export default function ProductionPage() {
                 {STAGES.map(s => (
                   <td key={s.key} style={{ textAlign: 'center', padding: '8px 4px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                      {canEdit && <button className="stage-btn" onClick={() => bump(client, s.key, -1)}>−</button>}
-                      <span style={{ fontSize: 13, fontWeight: 600, minWidth: 22, textAlign: 'center' }}>{client[s.key]}</span>
-                      {canEdit && <button className="stage-btn" onClick={() => bump(client, s.key, 1)}>+</button>}
+                      {canEdit && <button className="stage-btn" onClick={e => { e.stopPropagation(); bump(client, s.key, -1); }}>−</button>}
+                      <span style={{ fontSize: 13, fontWeight: 700, minWidth: 22, textAlign: 'center' }}>{client[s.key]}</span>
+                      {canEdit && <button className="stage-btn" onClick={e => { e.stopPropagation(); bump(client, s.key, 1); }}>+</button>}
                     </div>
                   </td>
                 ))}
@@ -146,7 +146,7 @@ export default function ProductionPage() {
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {canEdit && (
-                    <button onClick={() => openEdit(client)} style={{ background: 'none', border: '1px solid var(--brd)', borderRadius: 5, padding: '3px 8px', color: 'var(--mut)', cursor: 'pointer', fontSize: 11 }}>Edit</button>
+                    <button onClick={e => { e.stopPropagation(); openEdit(client); }} style={{ background: 'rgba(127,119,221,0.14)', border: '1px solid rgba(127,119,221,0.35)', borderRadius: 6, padding: '4px 10px', color: '#a49ff5', cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', transition: 'background 0.12s' }}>Edit</button>
                   )}
                 </td>
               </tr>

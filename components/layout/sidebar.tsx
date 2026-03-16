@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useProfile, useActivityLog } from '@/lib/hooks';
@@ -80,12 +80,30 @@ export function Sidebar() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const showToast = useToast();
 
+  // User menu dropdown
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userMenuPos, setUserMenuPos] = useState({ top: 0, left: 0 });
+  const userBtnRef = useRef<HTMLButtonElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        userMenuRef.current && !userMenuRef.current.contains(e.target as Node) &&
+        userBtnRef.current && !userBtnRef.current.contains(e.target as Node)
+      ) setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   const openSettings = () => {
     setNameVal(profile?.name || '');
     setEmailVal(profile?.email || '');
     setNewPassword(''); setConfirmPassword('');
     setSettingsTab('profile');
     setSettingsOpen(true);
+    setUserMenuOpen(false);
   };
 
   const saveProfile = async () => {
@@ -136,6 +154,16 @@ export function Sidebar() {
     router.push(`/${key}`);
   };
 
+  const toggleUserMenu = () => {
+    if (!userMenuOpen && userBtnRef.current) {
+      const r = userBtnRef.current.getBoundingClientRect();
+      const dropdownWidth = 220;
+      const left = Math.min(r.left, window.innerWidth - dropdownWidth - 8);
+      setUserMenuPos({ top: r.bottom + 8, left: Math.max(8, left) });
+    }
+    setUserMenuOpen(o => !o);
+  };
+
   useEffect(() => {
     if (!loading && !profile) router.push('/login');
   }, [loading, profile, router]);
@@ -157,6 +185,76 @@ export function Sidebar() {
   if (!profile) return null;
 
   const visibleNav = NAV_ITEMS.filter(n => role.boards.includes(n.key));
+
+  // ── Avatar button ────────────────────────────────────────
+  const AvatarButton = () => (
+    <button
+      ref={userBtnRef}
+      onClick={toggleUserMenu}
+      aria-label="User menu"
+      title={profile.name}
+      style={{
+        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+        background: userMenuOpen ? (role.color || '#7F77DD') + '40' : (role.color || '#7F77DD') + '22',
+        color: role.color || '#7F77DD',
+        border: `1.5px solid ${userMenuOpen ? (role.color || '#7F77DD') + '80' : (role.color || '#7F77DD') + '40'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 11, fontWeight: 700, cursor: 'pointer',
+        transition: 'all 0.15s',
+      }}
+    >
+      {profile.avatar || getInitials(profile.name)}
+    </button>
+  );
+
+  // ── User dropdown menu ───────────────────────────────────
+  const UserDropdown = () => (
+    <div
+      ref={userMenuRef}
+      style={{
+        position: 'fixed', top: userMenuPos.top, left: userMenuPos.left, zIndex: 1200,
+        width: 220, background: 'var(--bg-1)', border: '1px solid var(--brd)',
+        borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Profile info */}
+      <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--brd)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: (role.color || '#7F77DD') + '22', color: role.color || '#7F77DD', border: `1.5px solid ${(role.color || '#7F77DD') + '40'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+            {profile.avatar || getInitials(profile.name)}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: role.color, background: (role.color || '#888') + '20', padding: '1px 7px', borderRadius: 8, display: 'inline-block', marginTop: 2 }}>{role.label}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ padding: '6px 6px' }}>
+        <button
+          onClick={openSettings}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: 'transparent', border: 'none', borderRadius: 8, color: 'var(--fg)', cursor: 'pointer', fontSize: 13, fontWeight: 500, textAlign: 'left', transition: 'background 0.1s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <Settings size={15} style={{ color: 'var(--mut)', flexShrink: 0 }} />
+          Account settings
+        </button>
+        <div style={{ height: 1, background: 'var(--brd)', margin: '4px 6px' }} />
+        <button
+          onClick={handleLogout}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: 'transparent', border: 'none', borderRadius: 8, color: '#f87171', cursor: 'pointer', fontSize: 13, fontWeight: 500, textAlign: 'left', transition: 'background 0.1s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.07)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <LogOut size={15} style={{ flexShrink: 0 }} />
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
 
   // ── Shared nav items renderer ────────────────────────────
   const NavItems = ({ expanded }: { expanded: boolean }) => (
@@ -241,14 +339,15 @@ export function Sidebar() {
     return (
       <>
         {/* Fixed top bar */}
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 52, background: 'var(--bg-1)', borderBottom: '1px solid var(--brd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 300 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 52, background: 'var(--bg-1)', borderBottom: '1px solid var(--brd)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', zIndex: 300 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#7F77DD', lineHeight: 1.2 }}>VIRAL VISION</div>
             <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: 'var(--mut)' }}>OPERATING SYSTEM</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <NotificationPanel collapsed={true} />
-            <button onClick={() => setMobileOpen(true)} aria-label="Open menu" style={{ background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: 8 }}>
+            <AvatarButton />
+            <button onClick={() => setMobileOpen(true)} aria-label="Open menu" style={{ background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: '4px 6px', display: 'flex' }}>
               <Menu size={20} />
             </button>
           </div>
@@ -285,32 +384,9 @@ export function Sidebar() {
           <div style={{ flex: 1, padding: '4px 10px', overflowY: 'auto' }}>
             <NavItems expanded={true} />
           </div>
-
-          {/* Notifications */}
-          <div style={{ padding: '4px 10px', borderTop: '1px solid var(--brd)' }}>
-            <NotificationPanel collapsed={false} />
-          </div>
-
-          {/* Profile footer */}
-          <div style={{ padding: '12px 14px', borderTop: '1px solid var(--brd)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: (role.color || '#7F77DD') + '30', color: role.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                {profile.avatar || getInitials(profile.name)}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
-                <span style={{ fontSize: 10, fontWeight: 600, color: role.color, background: (role.color || '#888') + '28', padding: '1px 8px', borderRadius: 10 }}>{role.label}</span>
-              </div>
-              <button onClick={openSettings} aria-label="Account settings" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4 }}>
-                <Settings size={15} />
-              </button>
-            </div>
-            <button onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', background: 'transparent', border: '1px solid var(--brd)', borderRadius: 8, color: 'var(--fg)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
-              <LogOut size={14} /> Sign out
-            </button>
-          </div>
         </div>
 
+        {userMenuOpen && <UserDropdown />}
         <SettingsModal />
       </>
     );
@@ -323,47 +399,44 @@ export function Sidebar() {
         className="flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden"
         style={{ width: sidebarOpen ? 224 : 56, background: 'var(--bg-1)', borderRight: '1px solid var(--brd)' }}
       >
-        <div className="flex items-center gap-2 p-4" style={{ justifyContent: sidebarOpen ? 'space-between' : 'center' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: sidebarOpen ? '14px 12px 10px' : '14px 0 10px', justifyContent: sidebarOpen ? 'space-between' : 'center', gap: 6 }}>
           {sidebarOpen && (
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div className="text-sm font-extrabold" style={{ color: '#7F77DD' }}>VIRAL VISION</div>
               <div className="text-[11px] font-semibold tracking-widest" style={{ color: 'var(--mut)' }}>OPERATING SYSTEM</div>
             </div>
           )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6 }}>
-            <Menu size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 px-1.5 py-1">
-          <NavItems expanded={sidebarOpen} />
-        </div>
-
-        <div className="px-1.5 py-1" style={{ borderTop: '1px solid var(--brd)' }}>
-          <NotificationPanel collapsed={!sidebarOpen} />
-        </div>
-
-        {sidebarOpen && (
-          <div className="p-3" style={{ borderTop: '1px solid var(--brd)' }}>
-            <div className="flex items-center gap-2.5 mb-3 px-1">
-              <div className="flex items-center justify-center rounded-full text-xs font-bold flex-shrink-0" style={{ width: 32, height: 32, background: (role.color || '#7F77DD') + '30', color: role.color }}>
-                {profile.avatar || getInitials(profile.name)}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <div className="text-sm font-bold truncate">{profile.name}</div>
-                <span className="inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: (role.color || '#888') + '28', color: role.color }}>{role.label}</span>
-              </div>
-              <button onClick={openSettings} title="Settings" aria-label="Account settings" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0, opacity: 0.8 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}>
-                <Settings size={14} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: sidebarOpen ? 4 : 0, flexDirection: sidebarOpen ? 'row' : 'column', rowGap: 6 }}>
+            <NotificationPanel collapsed={true} />
+            <AvatarButton />
+            {sidebarOpen && (
+              <button onClick={() => setSidebarOpen(false)} aria-label="Collapse sidebar" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, display: 'flex' }}>
+                <Menu size={16} />
               </button>
-            </div>
-            <button onClick={handleLogout} className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium" style={{ background: 'transparent', border: '1px solid var(--brd)', color: 'var(--fg)', cursor: 'pointer' }}>
-              <LogOut size={14} /> Sign out
+            )}
+          </div>
+        </div>
+
+        {/* Collapse button when closed */}
+        {!sidebarOpen && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 6 }}>
+            <button onClick={() => setSidebarOpen(true)} aria-label="Expand sidebar" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 6, display: 'flex' }}>
+              <Menu size={16} />
             </button>
           </div>
         )}
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'var(--brd)', margin: '0 10px 6px' }} />
+
+        {/* Nav */}
+        <div className="flex-1 px-1.5 py-1" style={{ overflowY: 'auto' }}>
+          <NavItems expanded={sidebarOpen} />
+        </div>
       </div>
 
+      {userMenuOpen && <UserDropdown />}
       <SettingsModal />
     </>
   );

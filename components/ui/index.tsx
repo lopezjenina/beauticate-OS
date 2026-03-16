@@ -93,10 +93,12 @@ export function Modal({ open, onClose, title, children, width }: { open: boolean
   return (
     <div
       onClick={onClose}
+      className="modal-backdrop"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20, backdropFilter: 'blur(3px)' }}
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="modal-box"
         style={{ background: 'var(--bg-1)', borderRadius: 14, border: '1px solid var(--brd)', width: width || 520, maxWidth: '96vw', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--brd)', position: 'sticky', top: 0, background: 'var(--bg-1)', borderRadius: '14px 14px 0 0', zIndex: 1 }}>
@@ -121,7 +123,7 @@ export function FormRow({ label, children, required, span }: { label: string; ch
 }
 
 export function FormGrid({ children }: { children: ReactNode }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>{children}</div>;
+  return <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>{children}</div>;
 }
 
 export function Divider() {
@@ -141,13 +143,13 @@ export function Toast({ message, type, onClose }: { message: string; type: strin
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 12 }}>
-      <div>
+    <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, gap: 12 }}>
+      <div style={{ minWidth: 0 }}>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em' }}>{title}</h2>
         {subtitle && <p style={{ margin: '3px 0 0', color: 'var(--mut)', fontSize: 13 }}>{subtitle}</p>}
       </div>
       {children && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+        <div className="page-header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           {children}
         </div>
       )}
@@ -240,15 +242,16 @@ export function WeekHeader({
   return (
     <div
       onClick={onToggle}
+      className="week-header-row"
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 16px', background: 'var(--bg-2)',
         borderRadius: 8, border: '1px solid var(--brd)',
         cursor: 'pointer', marginBottom: collapsed ? 10 : 6,
-        userSelect: 'none',
+        userSelect: 'none', transition: 'background 0.12s, border-color 0.12s',
       }}
     >
-      <span style={{ fontSize: 10, opacity: 0.4, transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s', display: 'inline-block' }}>▶</span>
+      <span style={{ fontSize: 11, opacity: 0.75, transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)', transition: 'transform 0.15s', display: 'inline-block', color: '#7F77DD' }}>▶</span>
       <span style={{ fontSize: 13, fontWeight: 700 }}>{label}</span>
       <span style={{ fontSize: 12, color: 'var(--mut)' }}>{dateRange}</span>
       <span style={{ fontSize: 11, color: 'var(--mut)', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 20 }}>{count} client{count !== 1 ? 's' : ''}</span>

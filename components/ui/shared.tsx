@@ -11,7 +11,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: 200, padding: '8px 12px', borderRadius: 7, border: '1px solid var(--brd)', background: 'var(--bg-2)', color: 'var(--fg)', fontSize: 13, outline: 'none' }}
+      style={{ width: 200, minWidth: 120, padding: '8px 12px', borderRadius: 7, border: '1px solid var(--brd)', background: 'var(--bg-2)', color: 'var(--fg)', fontSize: 13, outline: 'none', flex: '1 1 auto' }}
     />
   );
 }

@@ -69,7 +69,7 @@ export default function SalesPage() {
       </div>
 
       {view === 'board' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${SALES_STAGES.length}, minmax(0,1fr))`, gap: 8 }}>
+        <div className="kanban-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${SALES_STAGES.length}, minmax(0,1fr))`, gap: 8 }}>
           {SALES_STAGES.map(stage => {
             const items = filtered.filter(s => s.stage === stage.key);
             const isOver = dragOver === stage.key;
@@ -112,7 +112,7 @@ export default function SalesPage() {
           })}
         </div>
       ) : (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+        <div className="table-wrap" style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
           <table>
             <thead>
               <tr>{['Company', 'Contact', 'Value', 'Stage', 'Source', ''].map(h => <th key={h}>{h}</th>)}</tr>

@@ -124,7 +124,7 @@ export default function AdsPage() {
           {!loading && filtered.length === 0 && <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 40, color: 'var(--mut)', fontSize: 13 }}>No campaigns found.</div>}
         </div>
       ) : (
-        <div style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
+        <div className="table-wrap" style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
           <table>
             <thead>
               <tr>{['Campaign', 'Client', 'Platform', 'Status', 'Budget', 'Spent', 'Utilization', ''].map(h => <th key={h}>{h}</th>)}</tr>

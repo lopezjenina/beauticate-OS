@@ -90,7 +90,7 @@ export default function PublishingPage() {
                   onToggle={() => setCollapsed(p => ({ ...p, [w.num]: !isCollapsed }))}
                 />
                 {!isCollapsed && weekItems.length > 0 && (
-                  <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+                  <div className="table-wrap" style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
                     <table>
                       <thead>
                         <tr>
@@ -107,7 +107,7 @@ export default function PublishingPage() {
                         {weekItems.map(item => {
                           const st = statusMap[item.status];
                           return (
-                            <tr key={item.id} style={{ cursor: canEditPublishing ? 'pointer' : 'default' }} onClick={() => { if (canEditPublishing) openEdit(item); }}>
+                            <tr key={item.id} className={canEditPublishing ? 'clickable-row' : ''} onClick={() => { if (canEditPublishing) openEdit(item); }}>
                               <td style={{ fontWeight: 600 }}>{item.title}</td>
                               <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.client_name}</td>
                               <td>{item.platform ? <Badge color="#7F77DD">{item.platform}</Badge> : <span style={{ color: 'var(--mut)', fontSize: 12 }}>—</span>}</td>
@@ -135,7 +135,7 @@ export default function PublishingPage() {
           {!loading && filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)' }}>No content found.</div>}
         </>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PUBLISH_STATUSES.length}, minmax(0,1fr))`, gap: 8 }}>
+        <div className="kanban-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${PUBLISH_STATUSES.length}, minmax(0,1fr))`, gap: 8 }}>
           {PUBLISH_STATUSES.map(status => {
             const colItems = filtered.filter(i => i.status === status.key);
             const isOver = dragOver === status.key;

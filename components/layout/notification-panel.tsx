@@ -24,9 +24,11 @@ function NotifIcon({ type }: { type: Notification['type'] }) {
 
 export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   // Close on outside click
   useEffect(() => {
@@ -47,7 +49,16 @@ export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
     <div ref={ref} style={{ position: 'relative' }}>
       {/* Bell button */}
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={() => {
+          if (!open && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            const panelWidth = 320;
+            const left = r.right - panelWidth < 0 ? r.left : r.right - panelWidth;
+            setPanelPos({ top: r.bottom + 8, left: Math.max(8, left) });
+          }
+          setOpen(o => !o);
+        }}
         title="Notifications"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         style={{
@@ -93,8 +104,8 @@ export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
       {/* Dropdown panel */}
       {open && (
         <div style={{
-          position: 'fixed', left: collapsed ? 64 : 232, bottom: 80, zIndex: 1000,
-          width: 320, maxHeight: 420, overflowY: 'auto',
+          position: 'fixed', top: panelPos.top, left: panelPos.left, zIndex: 1000,
+          width: Math.min(320, window.innerWidth - 16), maxHeight: 420, overflowY: 'auto',
           background: 'var(--bg-2)', border: '1px solid var(--brd)',
           borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
         }}>
@@ -118,6 +129,8 @@ export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
               <button
                 key={n.id}
                 onClick={() => handleClick(n)}
+                onMouseEnter={e => { e.currentTarget.style.background = n.is_read ? 'rgba(255,255,255,0.04)' : 'rgba(127,119,221,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = n.is_read ? 'transparent' : 'rgba(127,119,221,0.06)'; }}
                 style={{
                   display: 'flex', gap: 10, width: '100%', padding: '10px 14px',
                   background: n.is_read ? 'transparent' : 'rgba(127,119,221,0.06)',
@@ -136,7 +149,10 @@ export function NotificationPanel({ collapsed }: { collapsed: boolean }) {
                       {n.body}
                     </div>
                   )}
-                  <div style={{ fontSize: 10, color: 'var(--mut)', marginTop: 3 }}>{timeAgo(n.created_at)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--mut)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {timeAgo(n.created_at)}
+                    {n.link && <span style={{ color: '#7F77DD', fontWeight: 600 }}>· View →</span>}
+                  </div>
                 </div>
                 {!n.is_read && (
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7F77DD', flexShrink: 0, marginTop: 4 }} />

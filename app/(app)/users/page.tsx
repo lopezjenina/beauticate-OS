@@ -170,7 +170,7 @@ export default function UsersPage() {
         ))}
       </div>
 
-      <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
+      <div className="table-wrap" style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
         <table>
           <thead>
             <tr>
@@ -224,7 +224,7 @@ export default function UsersPage() {
           <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mut)', marginBottom: 10 }}>
             Pending invites ({pending.length})
           </div>
-          <div style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
+          <div className="table-wrap" style={{ background: 'var(--bg-2)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden' }}>
             <table>
               <thead>
                 <tr>

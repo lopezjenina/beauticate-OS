@@ -26,7 +26,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex" style={{ background: '#0B0B0F' }}>
       <Sidebar />
-      <main role="main" className="flex-1 overflow-auto" style={{ padding: '24px 28px', maxHeight: '100vh' }}>{children}</main>
+      <main role="main" className="app-main flex-1 overflow-auto" style={{ padding: '24px 28px', maxHeight: '100vh' }}>{children}</main>
     </div>
   );
 }

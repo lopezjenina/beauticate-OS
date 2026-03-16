@@ -24,13 +24,15 @@ export default function OnboardingPage() {
   const { data: items, loading, refetch } = useTable<OnboardingItem>('onboarding', 'created_at');
   const { user, role } = useAuth();
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<'all' | 'in_progress' | 'complete'>('all');
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
   const [editItem, setEditItem] = useState<OnboardingItem | null>(null);
   const [form, setForm] = useState(empty);
 
-  const filtered = items.filter(i => !search || i.client_name.toLowerCase().includes(search.toLowerCase()));
-  const inProgress = filtered.filter(i => i.status !== 'complete').length;
-  const complete = filtered.filter(i => i.status === 'complete').length;
+  const inProgress = items.filter(i => i.status !== 'complete').length;
+  const complete = items.filter(i => i.status === 'complete').length;
+  const tabFiltered = tab === 'all' ? items : items.filter(i => i.status === tab);
+  const filtered = tabFiltered.filter(i => !search || i.client_name.toLowerCase().includes(search.toLowerCase()));
   const doneChecks = filtered.reduce((a, i) => a + (i.contract_signed ? 1 : 0) + (i.invoice_paid ? 1 : 0) + (i.strategy_called ? 1 : 0) + (i.shoot_scheduled ? 1 : 0), 0);
   const totalChecks = filtered.length * 4;
 
@@ -46,9 +48,30 @@ export default function OnboardingPage() {
     if (!form.client_name) return;
     const status = checkCount(form) === 4 ? 'complete' : 'in_progress';
     const payload = { ...form, status, shoot_date: form.shoot_date || null };
+    const prevEditor = editItem?.editor_assigned || '';
     if (modal === 'edit' && editItem) { await update('onboarding', editItem.id, payload); }
     else { await insert('onboarding', payload); }
     await log(modal === 'edit' ? 'Onboarding updated' : 'Onboarding added', form.client_name, 'onboarding', 'success', user?.name || 'System');
+
+    // Send email if editor was newly assigned
+    if (form.editor_assigned && form.editor_assigned !== prevEditor) {
+      try {
+        const { TEAM_EMAILS } = await import('@/lib/constants');
+        const editorEmail = Object.entries(TEAM_EMAILS).find(([, v]) => v.name === form.editor_assigned)?.[0];
+        if (editorEmail) {
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'assignment',
+              to: editorEmail,
+              data: { recipientName: form.editor_assigned, clientName: form.client_name, role: 'editor', assignedBy: user?.name || 'Admin', link: '/onboarding' },
+            }),
+          });
+        }
+      } catch { /* non-blocking */ }
+    }
+
     setModal(null); setEditItem(null); refetch();
   };
 
@@ -75,6 +98,14 @@ export default function OnboardingPage() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search clients..." />
         {role.canEdit && <PrimaryButton onClick={openNew}>+ New client</PrimaryButton>}
       </PageHeader>
+
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+        {(['all', 'in_progress', 'complete'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--brd)', background: tab === t ? '#7F77DD' : 'var(--bg-2)', color: tab === t ? '#fff' : 'var(--mut)', fontSize: 12, fontWeight: tab === t ? 600 : 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {t === 'all' ? `All (${items.length})` : t === 'in_progress' ? `In progress (${inProgress})` : `Completed (${complete})`}
+          </button>
+        ))}
+      </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <MetricCard label="In progress" value={inProgress} />

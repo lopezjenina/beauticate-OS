@@ -6,7 +6,7 @@ export function createResend() {
   return new Resend(key);
 }
 
-export const FROM = process.env.RESEND_FROM || 'Viral Vision <notifications@viralvision.com>';
+export const FROM = process.env.RESEND_FROM || 'Viral Vision <notifications@viralvisionmk.space>';
 
 // ─── Email templates ────────────────────────────────────────────────────────
 
@@ -86,6 +86,19 @@ export function budgetAlertHtml(data: {
     <p style="font-size:13px;color:#7A7A82;margin-top:16px;">Log in to Viral Vision OS to pause or adjust the campaign.</p>
   `;
   return base('Budget Alert', body);
+}
+
+export function assignmentNotificationHtml(data: { recipientName: string; clientName: string; role: string; assignedBy: string; link: string }) {
+  const body = `
+    <p class="sub">You have been assigned to a client on Viral Vision OS.</p>
+    <div class="card">
+      <div class="row"><span style="color:#7A7A82">Client</span><span style="font-weight:700">${data.clientName}</span></div>
+      <div class="row"><span style="color:#7A7A82">Your role</span><span style="text-transform:capitalize">${data.role}</span></div>
+      <div class="row"><span style="color:#7A7A82">Assigned by</span><span>${data.assignedBy}</span></div>
+    </div>
+    <p style="font-size:13px;color:#7A7A82;margin-top:16px;">Log in to view your client details.</p>
+  `;
+  return base(`You've been assigned: ${data.clientName}`, body);
 }
 
 export function onboardingAlertHtml(data: { clientName: string; package: string; editor: string; addedBy: string }) {

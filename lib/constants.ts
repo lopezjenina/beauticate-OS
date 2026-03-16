@@ -54,8 +54,8 @@ export const NAV_ITEMS = [
   { key: 'publishing', label: 'Publishing', icon: 'Upload' },
   { key: 'ads', label: 'Ads', icon: 'Megaphone' },
   { key: 'activity', label: 'Activity Log', icon: 'Clock' },
-  { key: 'users', label: 'Team', icon: 'Users' },
-  { key: 'chat', label: 'Team Chat', icon: 'MessageSquare' },
+  { key: 'users', label: 'Team Management', icon: 'Users' },
+  { key: 'chat', label: 'Channels', icon: 'MessageSquare' },
 ] as const;
 
 // Pre-authorized team emails and their roles

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useProfile, useActivityLog } from '@/lib/hooks';
+import { NotificationPanel } from '@/components/layout/notification-panel';
 import { ROLES, NAV_ITEMS } from '@/lib/constants';
 import { Modal, FormRow, PrimaryButton } from '@/components/ui/shared';
 import { useToast } from '@/components/ui/toast-provider';
@@ -186,6 +187,10 @@ export function Sidebar() {
               </button>
             );
           })}
+        </div>
+
+        <div className="px-1.5 py-1" style={{ borderTop: '1px solid var(--brd)' }}>
+          <NotificationPanel collapsed={!sidebarOpen} />
         </div>
 
         {sidebarOpen && (

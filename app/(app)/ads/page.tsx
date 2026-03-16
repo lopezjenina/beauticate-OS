@@ -14,6 +14,8 @@ const emptyForm = { client_name: '', campaign_name: '', status: 'draft', budget:
 
 export default function AdsPage() {
   const { data: campaigns, loading, refetch } = useTable<AdCampaign>('ads', 'created_at');
+  const { data: activeClients } = useTable<{ id: string; name: string }>('clients', 'name');
+  const { data: onboardingItems } = useTable<{ id: string; client_name: string; status: string }>('onboarding', 'created_at');
   const { user, role } = useAuth();
   const showToast = useToast();
   const [search, setSearch] = useState('');
@@ -156,7 +158,13 @@ export default function AdsPage() {
       <Modal open={!!modal} onClose={() => { setModal(null); setEditItem(null); }} title={modal === 'edit' ? 'Edit campaign' : 'New campaign'}>
         <FormGrid>
           <FormRow label="Campaign name" required><input value={form.campaign_name} onChange={e => setForm({ ...form, campaign_name: e.target.value })} /></FormRow>
-          <FormRow label="Client" required><input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} /></FormRow>
+          <FormRow label="Client" required>
+            <select value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })}>
+              <option value="">Select client...</option>
+              {activeClients.length > 0 && <optgroup label="Active Clients">{activeClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>}
+              {onboardingItems.filter(o => o.status === 'in_progress').length > 0 && <optgroup label="Onboarding">{onboardingItems.filter(o => o.status === 'in_progress').map(o => <option key={o.id} value={o.client_name}>{o.client_name}</option>)}</optgroup>}
+            </select>
+          </FormRow>
           <FormRow label="Platform"><select value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })}><option value="">Select...</option>{PLATFORMS.map(p => <option key={p}>{p}</option>)}</select></FormRow>
           <FormRow label="Status"><select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>{AD_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></FormRow>
           <FormRow label="Budget ($)"><input type="number" value={form.budget} onChange={e => setForm({ ...form, budget: e.target.value })} /></FormRow>

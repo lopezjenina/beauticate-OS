@@ -3,21 +3,34 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+type LoginMode = 'password' | 'magic';
+
 export default function LoginPage() {
+  const [mode, setMode] = useState<LoginMode>('password');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const supabase = createClient();
 
+  const clearMessages = () => { setError(''); setMessage(''); };
+
   const handleGoogleLogin = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
+    if (error) setError(error.message);
+    setLoading(false);
+  };
+
+  const handlePasswordLogin = async () => {
+    if (!email || !password) return;
+    setLoading(true);
+    clearMessages();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     setLoading(false);
   };
@@ -25,12 +38,10 @@ export default function LoginPage() {
   const handleMagicLink = async () => {
     if (!email) return;
     setLoading(true);
-    setError('');
+    clearMessages();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) {
       setError(error.message);
@@ -65,12 +76,7 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 rounded-lg py-3 px-4 text-sm font-semibold transition-all mb-6"
-            style={{
-              background: '#fff',
-              color: '#1a1a1a',
-              opacity: loading ? 0.6 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
+            style={{ background: '#fff', color: '#1a1a1a', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -81,27 +87,44 @@ export default function LoginPage() {
             Continue with Google
           </button>
 
-          {/* Divider */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
-            <span className="text-xs" style={{ color: '#7A7A82' }}>or</span>
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          {/* Mode toggle */}
+          <div className="flex mb-5 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)', background: '#0B0B0F' }}>
+            {(['password', 'magic'] as LoginMode[]).map(m => (
+              <button key={m} onClick={() => { setMode(m); clearMessages(); }}
+                className="flex-1 py-2 text-xs font-semibold transition-all"
+                style={{ background: mode === m ? '#7F77DD' : 'transparent', color: mode === m ? '#fff' : '#7A7A82', cursor: 'pointer', border: 'none' }}>
+                {m === 'password' ? 'Password' : 'Magic link'}
+              </button>
+            ))}
           </div>
 
-          {/* Email Magic Link */}
-          <div className="mb-4">
-            <label className="block text-xs font-semibold mb-2" style={{ color: '#7A7A82' }}>
-              Email address
-            </label>
+          {/* Email */}
+          <div className="mb-3">
+            <label className="block text-xs font-semibold mb-2" style={{ color: '#7A7A82' }}>Email address</label>
             <input
               type="email"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(''); setMessage(''); }}
-              onKeyDown={(e) => e.key === 'Enter' && handleMagicLink()}
+              onChange={e => { setEmail(e.target.value); clearMessages(); }}
+              onKeyDown={e => e.key === 'Enter' && (mode === 'password' ? handlePasswordLogin() : handleMagicLink())}
               placeholder="you@viralvision.com"
               style={{ background: '#0B0B0F', fontSize: 14, padding: '12px 14px' }}
             />
           </div>
+
+          {/* Password field — only shown in password mode */}
+          {mode === 'password' && (
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-2" style={{ color: '#7A7A82' }}>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); clearMessages(); }}
+                onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+                placeholder="••••••••"
+                style={{ background: '#0B0B0F', fontSize: 14, padding: '12px 14px' }}
+              />
+            </div>
+          )}
 
           {error && (
             <div className="rounded-lg p-3 mb-4 text-xs font-medium"
@@ -109,7 +132,6 @@ export default function LoginPage() {
               {error}
             </div>
           )}
-
           {message && (
             <div className="rounded-lg p-3 mb-4 text-xs font-medium"
               style={{ background: 'rgba(99,153,34,0.08)', border: '1px solid rgba(99,153,34,0.25)', color: '#639922' }}>
@@ -118,21 +140,15 @@ export default function LoginPage() {
           )}
 
           <button
-            onClick={handleMagicLink}
-            disabled={loading || !email}
+            onClick={mode === 'password' ? handlePasswordLogin : handleMagicLink}
+            disabled={loading || !email || (mode === 'password' && !password)}
             className="w-full rounded-lg py-3 text-sm font-semibold transition-opacity"
-            style={{
-              background: '#7F77DD',
-              color: '#fff',
-              opacity: loading || !email ? 0.5 : 1,
-              cursor: loading || !email ? 'not-allowed' : 'pointer',
-            }}
+            style={{ background: '#7F77DD', color: '#fff', opacity: loading || !email || (mode === 'password' && !password) ? 0.5 : 1, cursor: loading || !email ? 'not-allowed' : 'pointer' }}
           >
-            {loading ? 'Sending...' : 'Send magic link'}
+            {loading ? 'Signing in...' : mode === 'password' ? 'Sign in' : 'Send magic link'}
           </button>
         </div>
 
-        {/* Team info */}
         <p className="text-center text-xs mt-6" style={{ color: '#7A7A82' }}>
           Only authorized Viral Vision team members can sign in.
           <br />Contact an admin if you need access.

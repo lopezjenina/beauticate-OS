@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Sale, LogType } from '@/types';
+import type { Sale, LogType, Notification } from '@/types';
 
 const supabase = createClient();
 
@@ -118,6 +118,52 @@ export function useSales() {
   }, []);
 
   return { sales, loading, reload: refetch, upsert, remove: removeSale, updateStage };
+}
+
+export function useNotifications() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifications = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    const list = (data || []) as Notification[];
+    setNotifications(list);
+    setUnreadCount(list.filter(n => !n.is_read).length);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  useEffect(() => {
+    const ch = supabase.channel('notifications_rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => fetchNotifications())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [fetchNotifications]);
+
+  const markRead = useCallback(async (id: string) => {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  }, []);
+
+  const markAllRead = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+  }, []);
+
+  return { notifications, unreadCount, loading, markRead, markAllRead, refetch: fetchNotifications };
 }
 
 export { supabase };

@@ -112,10 +112,38 @@ export interface ActivityEntry {
 
 export interface Message {
   id: string;
+  channel_id?: string;
   user_id: string;
   user_name: string;
   user_avatar: string | null;
   content: string;
+  created_at: string;
+}
+
+export type NotificationType = 'mention' | 'assignment' | 'system';
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  link: string;
+  is_read: boolean;
+  actor_id: string | null;
+  actor_name: string;
+  created_at: string;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  allowed_roles: string[];
+  is_default: boolean;
+  position: number;
+  created_by: string | null;
   created_at: string;
 }
 

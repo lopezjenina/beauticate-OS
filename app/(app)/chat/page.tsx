@@ -351,6 +351,9 @@ export default function ChatPage() {
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
   const [confirmDeleteChannel, setConfirmDeleteChannel] = useState<Channel | null>(null);
 
+  // Unread badges per channel
+  const [unreadChannels, setUnreadChannels] = useState<Record<string, number>>({});
+
   // Mobile: track which panel is visible
   const [isMobile, setIsMobile] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'channels' | 'chat'>('channels');
@@ -430,6 +433,29 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(ch); };
   }, [selectedId, scrollToBottom]);
 
+  // Unread badge subscription — watches all channels for new messages
+  useEffect(() => {
+    if (channels.length === 0) return;
+    const subs = channels.map(ch => {
+      return supabase
+        .channel(`unread_${ch.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'messages',
+          filter: `channel_id=eq.${ch.id}`,
+        }, () => {
+          // Only badge if this channel isn't currently open
+          setSelectedId(currentId => {
+            if (currentId !== ch.id) {
+              setUnreadChannels(prev => ({ ...prev, [ch.id]: (prev[ch.id] || 0) + 1 }));
+            }
+            return currentId;
+          });
+        })
+        .subscribe();
+    });
+    return () => { subs.forEach(s => supabase.removeChannel(s)); };
+  }, [channels]);
+
   // Realtime presence
   useEffect(() => {
     if (!user?.id) return;
@@ -487,6 +513,7 @@ export default function ChatPage() {
 
   const selectChannel = (id: string) => {
     setSelectedId(id);
+    setUnreadChannels(prev => { const next = { ...prev }; delete next[id]; return next; });
     setShowMembers(false);
     setEditingChannel(null);
     if (isMobile) setMobilePanel('chat');
@@ -545,7 +572,12 @@ export default function ChatPage() {
                 }}
               >
                 <Hash size={13} style={{ opacity: isActive ? 0.9 : 0.5, flexShrink: 0, color: isActive ? '#a49ff5' : 'var(--mut)' }} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isActive ? 'var(--fg)' : 'var(--mut)' }}>{ch.name}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, color: isActive ? 'var(--fg)' : 'var(--mut)' }}>{ch.name}</span>
+                {!isActive && unreadChannels[ch.id] > 0 && (
+                  <span style={{ background: '#7F77DD', color: '#fff', borderRadius: 10, fontSize: 10, fontWeight: 700, minWidth: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0, lineHeight: 1 }}>
+                    {unreadChannels[ch.id] > 9 ? '9+' : unreadChannels[ch.id]}
+                  </span>
+                )}
               </button>
               {role?.canManageUsers && (
                 <button

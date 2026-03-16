@@ -346,7 +346,7 @@ export function Sidebar() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <NotificationPanel collapsed={true} />
-            <AvatarButton />
+            {AvatarButton()}
             <button onClick={() => setMobileOpen(true)} aria-label="Open menu" style={{ background: 'none', border: 'none', color: 'var(--fg)', cursor: 'pointer', padding: '4px 6px', display: 'flex' }}>
               <Menu size={20} />
             </button>
@@ -382,12 +382,12 @@ export function Sidebar() {
 
           {/* Nav */}
           <div style={{ flex: 1, padding: '4px 10px', overflowY: 'auto' }}>
-            <NavItems expanded={true} />
+            {NavItems({ expanded: true })}
           </div>
         </div>
 
-        {userMenuOpen && <UserDropdown />}
-        <SettingsModal />
+        {userMenuOpen && UserDropdown()}
+        {SettingsModal()}
       </>
     );
   }
@@ -409,7 +409,7 @@ export function Sidebar() {
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: sidebarOpen ? 4 : 0, flexDirection: sidebarOpen ? 'row' : 'column', rowGap: 6 }}>
             <NotificationPanel collapsed={true} />
-            <AvatarButton />
+            {AvatarButton()}
             {sidebarOpen && (
               <button onClick={() => setSidebarOpen(false)} aria-label="Collapse sidebar" style={{ background: 'none', border: 'none', color: 'var(--mut)', cursor: 'pointer', padding: 4, display: 'flex' }}>
                 <Menu size={16} />
@@ -432,12 +432,12 @@ export function Sidebar() {
 
         {/* Nav */}
         <div className="flex-1 px-1.5 py-1" style={{ overflowY: 'auto' }}>
-          <NavItems expanded={sidebarOpen} />
+          {NavItems({ expanded: sidebarOpen })}
         </div>
       </div>
 
-      {userMenuOpen && <UserDropdown />}
-      <SettingsModal />
+      {userMenuOpen && UserDropdown()}
+      {SettingsModal()}
     </>
   );
 }

@@ -65,6 +65,7 @@ export default function ChatPage() {
   const [newChannelDesc, setNewChannelDesc] = useState('');
   const [newChannelRoles, setNewChannelRoles] = useState<string[]>(['admin', 'editor', 'social', 'viewer']);
   const [showMembers, setShowMembers] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
   // Channel editing
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -152,6 +153,25 @@ export default function ChatPage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [selectedId, scrollToBottom]);
+
+  // Realtime presence
+  useEffect(() => {
+    if (!user?.id) return;
+    const presenceCh = supabase.channel('presence_global', {
+      config: { presence: { key: user.id } },
+    });
+    presenceCh
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceCh.presenceState<{ user_id: string }>();
+        setOnlineUsers(new Set(Object.keys(state)));
+      })
+      .subscribe(async status => {
+        if (status === 'SUBSCRIBED') {
+          await presenceCh.track({ user_id: user.id });
+        }
+      });
+    return () => { supabase.removeChannel(presenceCh); };
+  }, [user?.id]);
 
   const parseMentions = useCallback((content: string): string[] => {
     const pattern = /@([\w]+(?:\s[\w]+)*)/g;
@@ -474,7 +494,16 @@ export default function ChatPage() {
               const rc = ROLES[p.role];
               return (
                 <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px' }}>
-                  <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar name={p.name} color={rc?.color || '#888780'} size={28} />
+                    {onlineUsers.has(p.id) && (
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0,
+                        width: 9, height: 9, borderRadius: '50%',
+                        background: '#4ade80', border: '2px solid var(--bg-1)',
+                      }} />
+                    )}
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--fg)' }}>{p.name}</div>
                     <div style={{ fontSize: 10, fontWeight: 600, color: rc?.color || '#888' }}>{rc?.label || p.role}</div>
@@ -630,20 +659,20 @@ export default function ChatPage() {
       <div style={{ position: 'relative', height: containerHeight, display: 'flex', flexDirection: 'column', margin: '0 -14px' }}>
         {mobilePanel === 'channels' ? (
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <ChannelList />
+            {ChannelList()}
             {editingChannel && (
               <div style={{ borderTop: '1px solid var(--brd)' }}>
-                <ChannelEditPanel ch={editingChannel} onClose={() => setEditingChannel(null)} />
+                {ChannelEditPanel({ ch: editingChannel, onClose: () => setEditingChannel(null) })}
               </div>
             )}
             {newChannelOpen && !editingChannel && role?.canManageUsers && (
               <div style={{ borderTop: '1px solid var(--brd)' }}>
-                <NewChannelForm onClose={() => setNewChannelOpen(false)} />
+                {NewChannelForm({ onClose: () => setNewChannelOpen(false) })}
               </div>
             )}
           </div>
         ) : (
-          <ChatPanel />
+          ChatPanel()
         )}
       </div>
     );
@@ -655,20 +684,20 @@ export default function ChatPage() {
     <div style={{ display: 'flex', height: '100vh', gap: 0, margin: '-24px -28px' }}>
       {/* Channel list sidebar */}
       <div style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--brd)', background: 'var(--bg-1)' }}>
-        <ChannelList />
+        {ChannelList()}
       </div>
 
       {/* Message area */}
-      <ChatPanel />
+      {ChatPanel()}
 
       {/* Right panel */}
       <div style={{ width: 240, flexShrink: 0, borderLeft: '1px solid var(--brd)', display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--bg-1)' }}>
         {editingChannel ? (
-          <ChannelEditPanel ch={editingChannel} onClose={() => setEditingChannel(null)} />
+          ChannelEditPanel({ ch: editingChannel, onClose: () => setEditingChannel(null) })
         ) : newChannelOpen && role?.canManageUsers ? (
-          <NewChannelForm onClose={() => setNewChannelOpen(false)} />
+          NewChannelForm({ onClose: () => setNewChannelOpen(false) })
         ) : (
-          <MembersPanel />
+          MembersPanel()
         )}
       </div>
     </div>
@@ -708,7 +737,16 @@ export default function ChatPage() {
             const rc = ROLES[p.role];
             return (
               <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 12px', borderRadius: 0 }}>
-                <Avatar name={p.name} color={rc?.color || '#888780'} size={30} />
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <Avatar name={p.name} color={rc?.color || '#888780'} size={30} />
+                  {onlineUsers.has(p.id) && (
+                    <span style={{
+                      position: 'absolute', bottom: 0, right: 0,
+                      width: 9, height: 9, borderRadius: '50%',
+                      background: '#4ade80', border: '2px solid var(--bg-1)',
+                    }} />
+                  )}
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.name}

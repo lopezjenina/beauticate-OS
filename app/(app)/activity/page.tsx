@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useTable } from '@/lib/hooks';
-import { MetricCard, Badge, PageHeader, SearchInput } from '@/components/ui/shared';
+import { useTable, supabase } from '@/lib/hooks';
+import { useAuth } from '@/components/auth-provider';
+import { MetricCard, Badge, PageHeader, SearchInput, DangerButton, ConfirmDialog } from '@/components/ui/shared';
 import type { ActivityEntry } from '@/types';
 
 const LOG_COLORS: Record<string, string> = { success: '#639922', info: '#378ADD', warning: '#EF9F27', error: '#E24B4A' };
@@ -31,10 +32,18 @@ function dateGroup(date: string): string {
 }
 
 export default function ActivityPage() {
-  const { data: logs } = useTable<ActivityEntry>('activity_log', 'created_at');
+  const { data: logs, refetch } = useTable<ActivityEntry>('activity_log', 'created_at');
+  const { role } = useAuth();
   const [search, setSearch] = useState('');
   const [boardFilter, setBoardFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  const clearLog = async () => {
+    await supabase.from('activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    setConfirmClear(false);
+    refetch();
+  };
 
   const filtered = logs.filter(l => {
     if (search && !l.action.toLowerCase().includes(search.toLowerCase()) && !l.detail.toLowerCase().includes(search.toLowerCase()) && !l.user_name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -55,7 +64,11 @@ export default function ActivityPage() {
 
   return (
     <div>
-      <PageHeader title="Activity log" subtitle="Real-time feed of all actions across boards." />
+      <PageHeader title="Activity log" subtitle="Real-time feed of all actions across boards.">
+        {role.canManageUsers && logs.length > 0 && (
+          <DangerButton onClick={() => setConfirmClear(true)}>Clear log</DangerButton>
+        )}
+      </PageHeader>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <MetricCard label="Total" value={filtered.length} accent="#7F77DD" />
@@ -97,6 +110,15 @@ export default function ActivityPage() {
       ))}
 
       {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 40, color: 'var(--mut)' }}>No activity found.</div>}
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear activity log?"
+        message="This permanently deletes all log entries and cannot be undone."
+        confirmLabel="Clear all"
+        danger
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={clearLog}
+      />
     </div>
   );
 }

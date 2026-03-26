@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSales, useProfile, useActivityLog, useRealtime } from '@/lib/hooks';
+import { useSales, useProfile, useActivityLog, supabase } from '@/lib/hooks';
 import { PageHeader, MetricCard, Badge, Modal, FormRow, FormGrid, PrimaryButton, GhostButton, DangerButton, ConfirmDialog } from '@/components/ui';
 import { SearchInput, ViewToggle } from '@/components/ui/shared';
 import { SALES_STAGES, LEAD_SOURCES } from '@/lib/constants';
@@ -22,8 +22,10 @@ export default function SalesPage() {
   const [editItem, setEditItem] = useState<Sale | null>(null);
   const [form, setForm] = useState({ company_name: '', contact_name: '', email: '', phone: '', deal_value: '', source: '', notes: '', stage: 'lead' });
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
-  useRealtime('sales', reload);
 
   const role = profile?.role ? (ROLES_MAP[profile.role as keyof typeof ROLES_MAP] || ROLES_MAP.viewer) : ROLES_MAP.viewer;
   const filtered = sales.filter(s => !search || s.company_name.toLowerCase().includes(search.toLowerCase()) || s.contact_name.toLowerCase().includes(search.toLowerCase()));
@@ -43,13 +45,47 @@ export default function SalesPage() {
   };
 
   const handleDelete = async (id: string) => {
+    const deal = sales.find(s => s.id === id);
     await remove(id);
-    await addLog('Deal deleted', '', 'sales', 'info', profile?.name || '');
+    // Cascade-delete matching onboarding entry
+    if (deal) await supabase.from('onboarding').delete().eq('client_name', deal.company_name);
+    await addLog('Deal deleted', deal?.company_name || '', 'sales', 'info', profile?.name || '');
     setModal(null); setEditItem(null);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkMoveStage = async (stageKey: string) => {
+    const ids = [...selectedIds];
+    await Promise.all(ids.map(id => updateStage(id, stageKey)));
+    await addLog(`Moved ${ids.length} deals to ${SALES_STAGES.find(s => s.key === stageKey)?.label}`, '', 'sales', 'success', profile?.name || '');
+    setSelectedIds(new Set());
+    reload();
+  };
+
+  const bulkDelete = async () => {
+    const ids = [...selectedIds];
+    const dealNames = ids.map(id => sales.find(s => s.id === id)?.company_name).filter(Boolean);
+    await Promise.all(ids.map(id => remove(id)));
+    await Promise.all(dealNames.map(name => supabase.from('onboarding').delete().eq('client_name', name)));
+    await addLog(`Deleted ${ids.length} deals`, '', 'sales', 'info', profile?.name || '');
+    setSelectedIds(new Set());
+    setConfirmBulkDelete(false);
+    reload();
   };
 
   const handleDrop = async (stageKey: string) => {
     if (!dragId) return;
+    const dragged = sales.find(s => s.id === dragId);
+    if (dragged && ['closed_won', 'closed_lost'].includes(dragged.stage)) {
+      setDragId(null); setDragOver(null); return; // locked once closed
+    }
     await updateStage(dragId, stageKey);
     setDragId(null); setDragOver(null);
   };
@@ -59,7 +95,12 @@ export default function SalesPage() {
       <PageHeader title="Sales Pipeline" subtitle="Drag cards to move deals between stages.">
         <SearchInput value={search} onChange={setSearch} placeholder="Search..." />
         <ViewToggle options={[{ key: 'board', label: 'Board' }, { key: 'list', label: 'List' }]} value={view} onChange={v => setView(v as 'board' | 'list')} />
-        {role.canEdit && <PrimaryButton onClick={openNew}>+ New lead</PrimaryButton>}
+        {role.canEdit && view === 'list' && (
+          <GhostButton onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()); }}>
+            {selectMode ? 'Cancel' : 'Select'}
+          </GhostButton>
+        )}
+        {role.canEdit && !selectMode && <PrimaryButton onClick={openNew}>+ New lead</PrimaryButton>}
       </PageHeader>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -115,13 +156,21 @@ export default function SalesPage() {
         <div className="table-wrap" style={{ background: 'var(--bg-2)', borderRadius: 10, border: '1px solid var(--brd)', overflow: 'hidden' }}>
           <table>
             <thead>
-              <tr>{['Company', 'Contact', 'Value', 'Stage', 'Source', ''].map(h => <th key={h}>{h}</th>)}</tr>
+              <tr>
+                {selectMode && <th style={{ width: 36 }} />}
+                {['Company', 'Contact', 'Value', 'Stage', 'Source', ''].map(h => <th key={h}>{h}</th>)}
+              </tr>
             </thead>
             <tbody>
               {filtered.map(item => {
                 const stg = SALES_STAGES.find(s => s.key === item.stage);
                 return (
-                  <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openEdit(item)}>
+                  <tr key={item.id} style={{ cursor: 'pointer', background: selectedIds.has(item.id) ? 'rgba(127,119,221,0.08)' : undefined }} onClick={() => { if (selectMode) toggleSelect(item.id); else openEdit(item); }}>
+                    {selectMode && (
+                      <td style={{ textAlign: 'center', padding: '0 8px' }} onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ accentColor: '#7F77DD', width: 14, height: 14, cursor: 'pointer' }} />
+                      </td>
+                    )}
                     <td style={{ fontWeight: 600 }}>{item.company_name}</td>
                     <td style={{ color: 'var(--mut)' }}>{item.contact_name}</td>
                     <td style={{ fontWeight: 600 }}>{formatPeso(item.deal_value)}</td>
@@ -169,6 +218,35 @@ export default function SalesPage() {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
       />
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`Delete ${selectedIds.size} deal${selectedIds.size !== 1 ? 's' : ''}?`}
+        message="This will permanently delete all selected deals."
+        confirmLabel="Delete all"
+        danger
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={bulkDelete}
+      />
+      {selectMode && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 14, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 200, minWidth: 360 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', flex: 1 }}>
+            {selectedIds.size === 0 ? 'Select deals to act on' : `${selectedIds.size} selected`}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--mut)', whiteSpace: 'nowrap' }}>Move to</span>
+            <select
+              disabled={selectedIds.size === 0}
+              defaultValue=""
+              onChange={e => { if (e.target.value) { bulkMoveStage(e.target.value); e.target.value = ''; } }}
+              style={{ background: 'var(--bg-2)', color: 'var(--fg)', border: '1px solid var(--brd)', borderRadius: 7, padding: '5px 8px', fontSize: 12, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', opacity: selectedIds.size === 0 ? 0.4 : 1 }}
+            >
+              <option value="" disabled>Stage...</option>
+              {SALES_STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </div>
+          <DangerButton onClick={() => setConfirmBulkDelete(true)} disabled={selectedIds.size === 0}>Delete</DangerButton>
+        </div>
+      )}
     </div>
   );
 }

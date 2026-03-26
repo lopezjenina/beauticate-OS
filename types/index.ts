@@ -110,6 +110,13 @@ export interface ActivityEntry {
   created_at: string;
 }
 
+export interface MessageAttachment {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 export interface Message {
   id: string;
   channel_id?: string;
@@ -117,6 +124,7 @@ export interface Message {
   user_name: string;
   user_avatar: string | null;
   content: string;
+  attachments?: MessageAttachment[];
   created_at: string;
 }
 

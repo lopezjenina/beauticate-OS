@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useTable, insert, update, remove, log } from '@/lib/hooks';
+import { useTable, insert, update, log, supabase } from '@/lib/hooks';
 import { useAuth } from '@/components/auth-provider';
-import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, DangerButton, Modal, FormRow, FormGrid, ProgressBar, PageLoader, ConfirmDialog } from '@/components/ui/shared';
+import { MetricCard, Badge, PageHeader, PrimaryButton, GhostButton, Modal, FormRow, FormGrid, ProgressBar, PageLoader } from '@/components/ui/shared';
+import { CheckCircle } from 'lucide-react';
 import { SearchInput } from '@/components/ui/shared';
 import { formatDate } from '@/lib/utils';
 import { EDITORS, VIDEOGRAPHERS, PACKAGES } from '@/lib/constants';
@@ -28,7 +29,8 @@ export default function OnboardingPage() {
   const [modal, setModal] = useState<'new' | 'edit' | null>(null);
   const [editItem, setEditItem] = useState<OnboardingItem | null>(null);
   const [form, setForm] = useState(empty);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [promptMoveClient, setPromptMoveClient] = useState<OnboardingItem | null>(null);
+  const [movingToProduction, setMovingToProduction] = useState(false);
 
   const inProgress = items.filter(i => i.status !== 'complete').length;
   const complete = items.filter(i => i.status === 'complete').length;
@@ -73,22 +75,58 @@ export default function OnboardingPage() {
       } catch { /* non-blocking */ }
     }
 
-    setModal(null); setEditItem(null); refetch();
+    setModal(null); refetch();
+    if (checkCount(form) === 4) {
+      const completed = editItem ? { ...editItem, ...form, status: 'complete' } as OnboardingItem : { ...form, status: 'complete', id: '', created_at: '' } as unknown as OnboardingItem;
+      setPromptMoveClient(completed);
+    }
+    setEditItem(null);
   };
 
-  const handleDelete = async (id: string) => {
-    await remove('onboarding', id);
-    await log('Onboarding removed', '', 'onboarding', 'info', user?.name || 'System');
-    setModal(null); setEditItem(null); refetch();
-  };
 
   const toggleCheck = async (item: OnboardingItem, key: ChecklistKey) => {
     if (!role.canEdit) return;
     const val = !item[key];
     const updated = { ...item, [key]: val };
+    const oldCount = (item.contract_signed ? 1 : 0) + (item.invoice_paid ? 1 : 0) + (item.strategy_called ? 1 : 0) + (item.shoot_scheduled ? 1 : 0);
     const newCount = (updated.contract_signed ? 1 : 0) + (updated.invoice_paid ? 1 : 0) + (updated.strategy_called ? 1 : 0) + (updated.shoot_scheduled ? 1 : 0);
     await update('onboarding', item.id, { [key]: val, status: newCount === 4 ? 'complete' : 'in_progress' });
     refetch();
+    if (newCount === 4 && oldCount < 4) {
+      setPromptMoveClient({ ...item, [key]: val, status: 'complete' } as OnboardingItem);
+    }
+  };
+
+  const moveToProduction = async (item: OnboardingItem) => {
+    setMovingToProduction(true);
+    // Check if already exists in production
+    const { count } = await supabase.from('clients').select('id', { count: 'exact', head: true }).eq('name', item.client_name);
+    if (count && count > 0) {
+      setPromptMoveClient(null);
+      setMovingToProduction(false);
+      return;
+    }
+    await insert('clients', {
+      name: item.client_name,
+      editor: item.editor_assigned || '',
+      videographer: item.videographer || '',
+      week_num: 1,
+      videos_target: 0,
+      videos_complete: 0,
+      shoot_date: item.shoot_date || null,
+      next_shoot: null,
+      status: 'on_track',
+      package_type: item.package_type || '',
+      notes: item.notes || '',
+      stage_shoot: 0,
+      stage_edit: 0,
+      stage_approval: 0,
+      stage_sent_guido: 0,
+      stage_posted: 0,
+    });
+    await log('Client moved to production', item.client_name, 'production', 'success', user?.name || 'System');
+    setPromptMoveClient(null);
+    setMovingToProduction(false);
   };
 
   if (loading) return <PageLoader />;
@@ -186,23 +224,42 @@ export default function OnboardingPage() {
           ))}
         </div>
         <FormRow label="Notes"><textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></FormRow>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20 }}>
-          <div>{modal === 'edit' && editItem && role.canDelete && <DangerButton onClick={() => setConfirmDelete(editItem.id)}>Delete</DangerButton>}</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
-            {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add client'}</PrimaryButton>}
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <GhostButton onClick={() => { setModal(null); setEditItem(null); }}>Cancel</GhostButton>
+          {role.canEdit && <PrimaryButton onClick={handleSave}>{modal === 'edit' ? 'Save changes' : 'Add client'}</PrimaryButton>}
         </div>
       </Modal>
-      <ConfirmDialog
-        open={!!confirmDelete}
-        title="Delete client?"
-        message="This action cannot be undone."
-        confirmLabel="Delete"
-        danger
-        onCancel={() => setConfirmDelete(null)}
-        onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
-      />
+
+      {/* Onboarding complete — move to production prompt */}
+      {promptMoveClient && (
+        <div onClick={() => setPromptMoveClient(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20, backdropFilter: 'blur(4px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-1)', borderRadius: 16, border: '1px solid var(--brd)', width: 400, maxWidth: '96vw', padding: 28, boxShadow: '0 24px 64px rgba(0,0,0,0.5)', textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <CheckCircle size={26} style={{ color: '#4ade80' }} />
+            </div>
+            <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: 'var(--fg)' }}>Onboarding complete!</h3>
+            <p style={{ margin: '0 0 8px', fontSize: 13.5, color: 'var(--mut)', lineHeight: 1.6 }}>
+              All checklist items for <span style={{ color: 'var(--fg)', fontWeight: 600 }}>{promptMoveClient.client_name}</span> are done.
+            </p>
+            <p style={{ margin: '0 0 24px', fontSize: 14, color: 'var(--fg)', fontWeight: 500 }}>Move this client to Production?</p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                onClick={() => setPromptMoveClient(null)}
+                style={{ background: 'transparent', color: 'var(--mut)', border: '1px solid var(--brd)', borderRadius: 9, padding: '9px 22px', cursor: 'pointer', fontSize: 13, fontWeight: 500, minWidth: 90 }}
+              >
+                Not now
+              </button>
+              <button
+                onClick={() => moveToProduction(promptMoveClient)}
+                disabled={movingToProduction}
+                style={{ background: 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)', color: '#fff', border: 'none', borderRadius: 9, padding: '9px 22px', cursor: movingToProduction ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 700, minWidth: 90, opacity: movingToProduction ? 0.6 : 1 }}
+              >
+                {movingToProduction ? 'Moving...' : 'Yes, move to Production'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

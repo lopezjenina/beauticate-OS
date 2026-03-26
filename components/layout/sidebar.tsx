@@ -163,10 +163,12 @@ export function Sidebar() {
     const LAST_VISIT_KEY = 'vv_last_chat_visit';
 
     if (currentBoard === 'chat') {
-      // Mark as visited now
-      localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+      // Clear badge while on chat
       setUnreadBoards(prev => { const next = { ...prev }; delete next.chat; return next; });
-      return;
+      // Stamp when LEAVING chat so we only count messages after departure
+      return () => {
+        localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+      };
     }
 
     const lastVisit = localStorage.getItem(LAST_VISIT_KEY) ?? new Date(0).toISOString();
@@ -281,7 +283,7 @@ export function Sidebar() {
         transition: 'all 0.15s',
       }}
     >
-      {profile.avatar || getInitials(profile.name)}
+      {getInitials(profile.name)}
     </button>
   );
 
@@ -300,7 +302,7 @@ export function Sidebar() {
       <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--brd)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: '50%', background: (role.color || '#7F77DD') + '22', color: role.color || '#7F77DD', border: `1.5px solid ${(role.color || '#7F77DD') + '40'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-            {profile.avatar || getInitials(profile.name)}
+            {getInitials(profile.name)}
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>

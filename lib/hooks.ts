@@ -103,19 +103,28 @@ export function useSales() {
   const upsert = useCallback(async (item: any) => {
     const payload = { ...item };
     if (item.id) {
-      await update('sales', item.id, payload);
+      const updated = await update('sales', item.id, payload);
+      setSales(prev => prev.map(s => s.id === item.id ? { ...s, ...updated } as Sale : s));
     } else {
-      await insert('sales', payload);
+      const created = await insert('sales', payload);
+      setSales(prev => [created as Sale, ...prev]);
     }
-  }, []);
+  }, [setSales]);
 
   const removeSale = useCallback(async (id: string) => {
+    setSales(prev => prev.filter(s => s.id !== id));
     await remove('sales', id);
-  }, []);
+  }, [setSales]);
 
   const updateStage = useCallback(async (id: string, stage: string) => {
-    // Optimistic update — move the card immediately in UI
-    setSales(prev => prev.map(s => s.id === id ? { ...s, stage: stage as Sale['stage'] } : s));
+    // Locked once closed — prevent moving back to active stages
+    setSales(prev => {
+      const current = prev.find(s => s.id === id);
+      if (current && ['closed_won', 'closed_lost'].includes(current.stage)) return prev;
+      return prev.map(s => s.id === id ? { ...s, stage: stage as Sale['stage'] } : s);
+    });
+    const current = (await supabase.from('sales').select('stage').eq('id', id).single()).data;
+    if (current && ['closed_won', 'closed_lost'].includes(current.stage)) return;
     await update('sales', id, { stage });
   }, [setSales]);
 

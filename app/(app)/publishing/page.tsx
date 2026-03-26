@@ -13,7 +13,7 @@ import type { PublishItem } from '@/types';
 const emptyForm = { client_name: '', title: '', caption: '', scheduled_date: '', platform: '', status: 'pending_caption', week_num: '1' };
 
 export default function PublishingPage() {
-  const { data: items, loading, refetch } = useTable<PublishItem>('publishing', 'created_at');
+  const { data: items, setData: setItems, loading, refetch } = useTable<PublishItem>('publishing', 'created_at');
   const { data: activeClients } = useTable<{ id: string; name: string }>('clients', 'name');
   const { data: onboardingItems } = useTable<{ id: string; client_name: string; status: string }>('onboarding', 'created_at');
   const { user, role } = useAuth();
@@ -28,6 +28,9 @@ export default function PublishingPage() {
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const filtered = items.filter(i => !search || i.client_name.toLowerCase().includes(search.toLowerCase()) || i.title.toLowerCase().includes(search.toLowerCase()));
 
@@ -52,6 +55,27 @@ export default function PublishingPage() {
     setModal(null); setEditItem(null); refetch();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  };
+
+  const bulkMoveStatus = async (statusKey: string) => {
+    const ids = new Set(selectedIds);
+    setItems(prev => prev.map(i => ids.has(i.id) ? { ...i, status: statusKey as PublishItem['status'] } : i));
+    setSelectedIds(new Set());
+    await Promise.all([...ids].map(id => update('publishing', id, { status: statusKey })));
+    await log(`Moved ${ids.size} items to ${PUBLISH_STATUSES.find(s => s.key === statusKey)?.label}`, '', 'publishing', 'success', user?.name || 'System');
+  };
+
+  const bulkDelete = async () => {
+    const ids = new Set(selectedIds);
+    setItems(prev => prev.filter(i => !ids.has(i.id)));
+    setSelectedIds(new Set());
+    setConfirmBulkDelete(false);
+    await Promise.all([...ids].map(id => remove('publishing', id)));
+    await log(`Deleted ${ids.size} content items`, '', 'publishing', 'info', user?.name || 'System');
+  };
+
   const handleDrop = async (statusKey: string) => {
     if (!dragId) return;
     await update('publishing', dragId, { status: statusKey });
@@ -67,7 +91,12 @@ export default function PublishingPage() {
       <PageHeader title="Publishing" subtitle="Content calendar grouped by delivery week.">
         <SearchInput value={search} onChange={setSearch} placeholder="Search content..." />
         <ViewToggle options={[{ key: 'weekly', label: 'Weekly' }, { key: 'board', label: 'Board' }]} value={view} onChange={v => setView(v as 'weekly' | 'board')} />
-        {canEditPublishing && <PrimaryButton onClick={openNew}>+ New content</PrimaryButton>}
+        {canEditPublishing && view === 'weekly' && (
+          <GhostButton onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()); }}>
+            {selectMode ? 'Cancel' : 'Select'}
+          </GhostButton>
+        )}
+        {canEditPublishing && !selectMode && <PrimaryButton onClick={openNew}>+ New content</PrimaryButton>}
       </PageHeader>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -94,6 +123,7 @@ export default function PublishingPage() {
                     <table>
                       <thead>
                         <tr>
+                          {selectMode && <th style={{ width: 36 }} />}
                           <th style={{ width: '28%' }}>Title</th>
                           <th style={{ width: '16%' }}>Client</th>
                           <th style={{ width: '13%' }}>Platform</th>
@@ -107,7 +137,12 @@ export default function PublishingPage() {
                         {weekItems.map(item => {
                           const st = statusMap[item.status];
                           return (
-                            <tr key={item.id} className={canEditPublishing ? 'clickable-row' : ''} onClick={() => { if (canEditPublishing) openEdit(item); }}>
+                            <tr key={item.id} className={canEditPublishing && !selectMode ? 'clickable-row' : ''} style={{ background: selectedIds.has(item.id) ? 'rgba(127,119,221,0.08)' : undefined }} onClick={() => { if (selectMode) toggleSelect(item.id); else if (canEditPublishing) openEdit(item); }}>
+                              {selectMode && (
+                                <td style={{ textAlign: 'center', padding: '0 8px' }} onClick={e => e.stopPropagation()}>
+                                  <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggleSelect(item.id)} style={{ accentColor: '#7F77DD', width: 14, height: 14, cursor: 'pointer' }} />
+                                </td>
+                              )}
                               <td style={{ fontWeight: 600 }}>{item.title}</td>
                               <td style={{ color: 'var(--mut)', fontSize: 12 }}>{item.client_name}</td>
                               <td>{item.platform ? <Badge color="#7F77DD">{item.platform}</Badge> : <span style={{ color: 'var(--mut)', fontSize: 12 }}>—</span>}</td>
@@ -215,6 +250,35 @@ export default function PublishingPage() {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
       />
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`Delete ${selectedIds.size} item${selectedIds.size !== 1 ? 's' : ''}?`}
+        message="This will permanently delete all selected content."
+        confirmLabel="Delete all"
+        danger
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={bulkDelete}
+      />
+      {selectMode && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 14, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 200, minWidth: 380 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', flex: 1 }}>
+            {selectedIds.size === 0 ? 'Select content to act on' : `${selectedIds.size} selected`}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--mut)', whiteSpace: 'nowrap' }}>Move to</span>
+            <select
+              disabled={selectedIds.size === 0}
+              defaultValue=""
+              onChange={e => { if (e.target.value) { bulkMoveStatus(e.target.value); e.target.value = ''; } }}
+              style={{ background: 'var(--bg-2)', color: 'var(--fg)', border: '1px solid var(--brd)', borderRadius: 7, padding: '5px 8px', fontSize: 12, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', opacity: selectedIds.size === 0 ? 0.4 : 1 }}
+            >
+              <option value="" disabled>Status...</option>
+              {PUBLISH_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </div>
+          <DangerButton onClick={() => setConfirmBulkDelete(true)} disabled={selectedIds.size === 0}>Delete</DangerButton>
+        </div>
+      )}
     </div>
   );
 }

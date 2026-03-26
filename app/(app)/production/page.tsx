@@ -35,7 +35,7 @@ function editorInitials(name: string) {
 const emptyForm = { name: '', editor: '', videographer: '', week_num: '1', videos_target: '4', videos_complete: '0', shoot_date: '', next_shoot: '', status: 'on_track', package_type: '', notes: '', stage_shoot: '0', stage_edit: '0', stage_approval: '0', stage_sent_guido: '0', stage_posted: '0' };
 
 export default function ProductionPage() {
-  const { data: clients, loading, refetch } = useTable<Client>('clients', 'created_at');
+  const { data: clients, setData: setClients, loading, refetch } = useTable<Client>('clients', 'created_at');
   const { user, role } = useAuth();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'week' | 'editor'>('week');
@@ -44,6 +44,9 @@ export default function ProductionPage() {
   const [form, setForm] = useState(emptyForm);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const filtered = clients.filter(c =>
     !search ||
@@ -80,6 +83,31 @@ export default function ProductionPage() {
     setModal(null); setEditItem(null); refetch();
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkMove = async (weekNum: number) => {
+    const ids = new Set(selectedIds);
+    setClients(prev => prev.map(c => ids.has(c.id) ? { ...c, week_num: weekNum } : c));
+    setSelectedIds(new Set());
+    await Promise.all([...ids].map(id => update('clients', id, { week_num: weekNum })));
+    await log(`Moved ${ids.size} clients to Week ${weekNum}`, '', 'production', 'success', user?.name || 'System');
+  };
+
+  const bulkDelete = async () => {
+    const ids = new Set(selectedIds);
+    setClients(prev => prev.filter(c => !ids.has(c.id)));
+    setSelectedIds(new Set());
+    setConfirmBulkDelete(false);
+    await Promise.all([...ids].map(id => remove('clients', id)));
+    await log(`Deleted ${ids.size} clients`, '', 'production', 'info', user?.name || 'System');
+  };
+
   const bump = async (client: Client, key: StageKey, delta: number) => {
     if (!canEditClient(client)) return;
     const val = Math.max(0, client[key] + delta);
@@ -92,6 +120,7 @@ export default function ProductionPage() {
       <table style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr>
+            {selectMode && <th style={{ width: 36 }} />}
             <th style={{ width: '22%' }}>Client</th>
             {showEditorCol && <th style={{ width: '11%' }}>Editor</th>}
             <th style={{ width: '18%' }}>Videos</th>
@@ -105,8 +134,24 @@ export default function ProductionPage() {
             const sc = statusColor(client.status);
             const canEdit = canEditClient(client);
             const ec = editorColor(client.editor);
+            const isSelected = selectedIds.has(client.id);
             return (
-              <tr key={client.id} className={`prod-row${canEdit ? ' editable' : ''}`} style={{ opacity: !role.canManageUsers && !canEdit ? 0.55 : 1 }} onClick={() => { if (canEdit) openEdit(client); }}>
+              <tr
+                key={client.id}
+                className={`prod-row${canEdit && !selectMode ? ' editable' : ''}`}
+                style={{ opacity: !role.canManageUsers && !canEdit ? 0.55 : 1, background: isSelected ? 'rgba(127,119,221,0.08)' : undefined }}
+                onClick={() => { if (selectMode) { toggleSelect(client.id); } else if (canEdit) { openEdit(client); } }}
+              >
+                {selectMode && (
+                  <td style={{ textAlign: 'center', padding: '0 8px' }} onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelect(client.id)}
+                      style={{ accentColor: '#7F77DD', width: 14, height: 14, cursor: 'pointer' }}
+                    />
+                  </td>
+                )}
                 <td>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{client.name}</div>
                   {client.package_type && <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 1 }}>{client.package_type}</div>}
@@ -164,7 +209,12 @@ export default function ProductionPage() {
       <PageHeader title="Production" subtitle="Weekly video production tracker.">
         <SearchInput value={search} onChange={setSearch} placeholder="Search clients..." />
         <ViewToggle options={[{ key: 'week', label: 'By Week' }, { key: 'editor', label: 'By Editor' }]} value={view} onChange={v => setView(v as 'week' | 'editor')} />
-        {role.canManageUsers && <PrimaryButton onClick={openNew}>+ New client</PrimaryButton>}
+        {role.canEdit && (
+          <GhostButton onClick={() => { setSelectMode(s => !s); setSelectedIds(new Set()); }}>
+            {selectMode ? 'Cancel' : 'Select'}
+          </GhostButton>
+        )}
+        {role.canManageUsers && !selectMode && <PrimaryButton onClick={openNew}>+ New client</PrimaryButton>}
       </PageHeader>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -273,6 +323,46 @@ export default function ProductionPage() {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={() => { if (confirmDelete) { handleDelete(confirmDelete); setConfirmDelete(null); } }}
       />
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`Delete ${selectedIds.size} client${selectedIds.size !== 1 ? 's' : ''}?`}
+        message="This will permanently delete all selected clients. This cannot be undone."
+        confirmLabel="Delete all"
+        danger
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={bulkDelete}
+      />
+
+      {/* Bulk action bar */}
+      {selectMode && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--bg-1)', border: '1px solid var(--brd)',
+          borderRadius: 14, padding: '10px 16px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          zIndex: 200, minWidth: 360,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--fg)', flex: 1 }}>
+            {selectedIds.size === 0 ? 'Select clients to act on' : `${selectedIds.size} selected`}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--mut)', whiteSpace: 'nowrap' }}>Move to</span>
+            <select
+              disabled={selectedIds.size === 0}
+              defaultValue=""
+              onChange={e => { if (e.target.value) { bulkMove(Number(e.target.value)); e.target.value = ''; } }}
+              style={{ background: 'var(--bg-2)', color: 'var(--fg)', border: '1px solid var(--brd)', borderRadius: 7, padding: '5px 8px', fontSize: 12, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', opacity: selectedIds.size === 0 ? 0.4 : 1 }}
+            >
+              <option value="" disabled>Week...</option>
+              {[1, 2, 3, 4].map(w => <option key={w} value={w}>Week {w}</option>)}
+            </select>
+          </div>
+          <DangerButton onClick={() => setConfirmBulkDelete(true)} disabled={selectedIds.size === 0}>
+            Delete
+          </DangerButton>
+        </div>
+      )}
     </div>
   );
 }

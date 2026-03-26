@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { supabase } from '@/lib/hooks';
 import { ROLES } from '@/lib/constants';
-import { ChevronLeft, Users, Settings, Trash2, X, Send, Hash } from 'lucide-react';
-import type { Message, Profile, Channel } from '@/types';
+import { ChevronLeft, Users, Settings, Trash2, X, Send, Hash, Paperclip, Download, FileText } from 'lucide-react';
+import type { Message, MessageAttachment, Profile, Channel } from '@/types';
 
 function timeLabel(iso: string) {
   const d = new Date(iso);
@@ -75,7 +75,27 @@ const ChatMessageInput = memo(function ChatMessageInput({
   const [sending, setSending] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<Profile[]>([]);
   const [mentionIdx, setMentionIdx] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<{ file: File; preview: string }[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const entries = files.map(file => ({
+      file,
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
+    }));
+    setPendingFiles(prev => [...prev, ...entries]);
+    e.target.value = '';
+  };
+
+  const removeFile = (idx: number) => {
+    setPendingFiles(prev => {
+      const entry = prev[idx];
+      if (entry.preview) URL.revokeObjectURL(entry.preview);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
 
   const insertMention = useCallback((profile: Profile) => {
     const cursor = inputRef.current?.selectionStart ?? input.length;
@@ -113,18 +133,41 @@ const ChatMessageInput = memo(function ChatMessageInput({
 
   const send = async () => {
     const content = input.trim();
-    if (!content || !userId || sending || !selectedId) return;
+    if (!content && pendingFiles.length === 0) return;
+    if (!userId || sending || !selectedId) return;
     setSending(true);
     setInput('');
     setMentionSuggestions([]);
+
+    // Upload attachments
+    let attachments: MessageAttachment[] = [];
+    if (pendingFiles.length > 0) {
+      const uploads = await Promise.all(pendingFiles.map(async ({ file }) => {
+        const ext = file.name.split('.').pop() || 'bin';
+        const path = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error } = await supabase.storage.from('chat-attachments').upload(path, file);
+        if (error) return null;
+        const { data } = supabase.storage.from('chat-attachments').getPublicUrl(path);
+        return { url: data.publicUrl, name: file.name, type: file.type, size: file.size };
+      }));
+      attachments = uploads.filter(Boolean) as MessageAttachment[];
+      pendingFiles.forEach(({ preview }) => { if (preview) URL.revokeObjectURL(preview); });
+      setPendingFiles([]);
+    }
+
     onScrollBottom();
     const { data: saved, error } = await supabase
       .from('messages')
-      .insert({ channel_id: selectedId, user_id: userId, user_name: userName || userEmail || 'Unknown', user_avatar: userAvatar || null, content })
+      .insert({
+        channel_id: selectedId, user_id: userId,
+        user_name: userName || userEmail || 'Unknown', user_avatar: userAvatar || null,
+        content: content || '',
+        ...(attachments.length > 0 && { attachments }),
+      })
       .select().single();
     if (error) {
       setInput(content);
-    } else if (saved) {
+    } else if (saved && content) {
       const pattern = /@([\w]+(?:\s[\w]+)*)/g;
       const names = [...content.matchAll(pattern)].map(m => m[1].toLowerCase());
       const mentionedIds = profiles.filter(p => names.some(n => p.name.toLowerCase() === n) && p.id !== userId).map(p => p.id);
@@ -152,7 +195,32 @@ const ChatMessageInput = memo(function ChatMessageInput({
   };
 
   return (
-    <div style={{ flexShrink: 0, borderTop: '1px solid var(--brd)', padding: isMobile ? '10px 12px 12px' : '12px 20px 16px', background: 'var(--bg-1)' }}>
+    <div style={{ flexShrink: 0, borderTop: '1px solid var(--brd)', background: 'var(--bg-1)' }}>
+      {/* File preview row */}
+      {pendingFiles.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '8px 14px 4px' }}>
+          {pendingFiles.map(({ file, preview }, i) => (
+            <div key={i} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 5, background: 'var(--bg-2)', border: '1px solid rgba(127,119,221,0.3)', borderRadius: 8, padding: preview ? 3 : '5px 9px', overflow: 'hidden', maxWidth: 140 }}>
+              {preview ? (
+                <img src={preview} alt={file.name} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6 }} />
+              ) : (
+                <>
+                  <FileText size={13} style={{ color: '#a49ff5', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                </>
+              )}
+              <button
+                onClick={() => removeFile(i)}
+                style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', color: '#fff', cursor: 'pointer', width: 17, height: 17, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}
+                aria-label="Remove file"
+              >
+                <X size={9} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ padding: isMobile ? '8px 12px 12px' : '10px 20px 16px' }}>
       <div style={{ position: 'relative' }}>
         {mentionSuggestions.length > 0 && (
           <div style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: isMobile ? 0 : 52, background: 'var(--bg-1)', border: '1px solid var(--brd)', borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,0.5)', zIndex: 100 }}>
@@ -179,13 +247,20 @@ const ChatMessageInput = memo(function ChatMessageInput({
             onFocus={e => { e.currentTarget.parentElement!.style.borderColor = 'rgba(127,119,221,0.45)'; }}
             onBlur={e => { e.currentTarget.parentElement!.style.borderColor = 'var(--brd)'; }}
           />
-          <button onClick={send} disabled={!input.trim() || sending || !selectedId}
-            style={{ background: input.trim() && !sending ? 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)' : 'rgba(255,255,255,0.05)', color: input.trim() && !sending ? '#fff' : 'var(--mut)', border: 'none', borderRadius: 9, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: input.trim() && !sending ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}
+          <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" onChange={handleFileChange} style={{ display: 'none' }} />
+          <button onClick={() => fileInputRef.current?.click()} disabled={sending || !selectedId}
+            style={{ background: 'transparent', color: 'var(--mut)', border: 'none', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: sending || !selectedId ? 'not-allowed' : 'pointer', borderRadius: 8, flexShrink: 0, opacity: sending || !selectedId ? 0.4 : 1 }}
+            aria-label="Attach file">
+            <Paperclip size={16} />
+          </button>
+          <button onClick={send} disabled={(!input.trim() && pendingFiles.length === 0) || sending || !selectedId}
+            style={{ background: (input.trim() || pendingFiles.length > 0) && !sending ? 'linear-gradient(135deg, #8B84E6 0%, #6B63CC 100%)' : 'rgba(255,255,255,0.05)', color: (input.trim() || pendingFiles.length > 0) && !sending ? '#fff' : 'var(--mut)', border: 'none', borderRadius: 9, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (input.trim() || pendingFiles.length > 0) && !sending ? 'pointer' : 'not-allowed', transition: 'all 0.15s', flexShrink: 0 }}
             aria-label="Send message">
             {sending ? <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} /> : <Send size={15} />}
           </button>
         </div>
-        {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 5 }}>Enter to send · Shift+Enter for new line · @ to mention</div>}
+        {!isMobile && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 5 }}>Enter to send · Shift+Enter for new line · @ to mention · 📎 to attach</div>}
+      </div>
       </div>
     </div>
   );
@@ -752,7 +827,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div style={{
-                    padding: '9px 14px',
+                    padding: msg.content ? '9px 14px' : '6px 8px',
                     borderRadius: 14,
                     borderBottomRightRadius: msg.isOwn ? 4 : 14,
                     borderBottomLeftRadius: msg.isOwn ? 14 : 4,
@@ -763,7 +838,34 @@ export default function ChatPage() {
                     wordBreak: 'break-word', whiteSpace: 'pre-wrap',
                     boxShadow: msg.isOwn ? '0 2px 12px rgba(127,119,221,0.25)' : 'none',
                   }}>
-                    <MessageContent content={msg.content} isOwn={msg.isOwn} />
+                    {msg.content ? <MessageContent content={msg.content} isOwn={msg.isOwn} /> : null}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: msg.content ? 8 : 0 }}>
+                        {msg.attachments.map((att, ai) => {
+                          const isImage = att.type.startsWith('image/');
+                          if (isImage) {
+                            return (
+                              <img
+                                key={ai} src={att.url} alt={att.name}
+                                onClick={() => window.open(att.url, '_blank')}
+                                style={{ maxWidth: isMobile ? 200 : 280, maxHeight: 200, borderRadius: 8, objectFit: 'cover', cursor: 'pointer', display: 'block' }}
+                              />
+                            );
+                          }
+                          return (
+                            <a key={ai} href={att.url} target="_blank" rel="noreferrer"
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: msg.isOwn ? 'rgba(255,255,255,0.12)' : 'var(--bg-1)', borderRadius: 8, border: `1px solid ${msg.isOwn ? 'rgba(255,255,255,0.12)' : 'var(--brd)'}`, textDecoration: 'none' }}>
+                              <FileText size={15} style={{ color: msg.isOwn ? '#d4d0ff' : '#a49ff5', flexShrink: 0 }} />
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: msg.isOwn ? '#fff' : 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</div>
+                                <div style={{ fontSize: 10, color: msg.isOwn ? 'rgba(255,255,255,0.55)' : 'var(--mut)' }}>{(att.size / 1024).toFixed(0)} KB</div>
+                              </div>
+                              <Download size={13} style={{ color: msg.isOwn ? 'rgba(255,255,255,0.6)' : 'var(--mut)', flexShrink: 0 }} />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

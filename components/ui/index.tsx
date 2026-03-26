@@ -179,11 +179,12 @@ export function GhostButton({ onClick, children }: { onClick?: () => void; child
   );
 }
 
-export function DangerButton({ onClick, children }: { onClick?: () => void; children: ReactNode }) {
+export function DangerButton({ onClick, children, disabled }: { onClick?: () => void; children: ReactNode; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
-      style={{ background: 'rgba(248,113,113,0.08)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 7, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
+      disabled={disabled}
+      style={{ background: 'rgba(248,113,113,0.08)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 7, padding: '8px 14px', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0, opacity: disabled ? 0.4 : 1 }}
     >
       {children}
     </button>

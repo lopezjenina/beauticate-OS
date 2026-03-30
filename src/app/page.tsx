@@ -13,6 +13,8 @@ import EditorsPage from "./editors/EditorsPage";
 import AdsPage from "./ads/AdsPage";
 import KnowledgePage from "./knowledge/KnowledgePage";
 import UsersPage from "./users/UsersPage";
+import CalendarPage from "./calendar/CalendarPage";
+import ActivityPage from "./activity/ActivityPage";
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, TEAM, EDITORS,
 } from "@/lib/store";
@@ -85,6 +87,8 @@ export default function App() {
     switch (page) {
       case "dashboard":
         return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
+      case "calendar":
+        return <CalendarPage clients={clients} videos={videos} />;
       case "sales":
         return <SalesPage leads={leads} setLeads={setLeads} onClosedWon={handleClosedWon} canDelete={canDelete} />;
       case "onboarding":
@@ -108,6 +112,8 @@ export default function App() {
         return <AdsPage ads={ads} setAds={setAds} clients={clients} canDelete={canDelete} />;
       case "knowledge":
         return <KnowledgePage canDelete={canDelete} />;
+      case "activity":
+        return <ActivityPage />;
       case "users":
         return isSuperAdminUser ? <UsersPage users={users} setUsers={setUsers} /> : <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
       default:
@@ -123,6 +129,10 @@ export default function App() {
         userName={user.name}
         approvalCount={approvalCount}
         onSignOut={() => setUser(null)}
+        videos={videos}
+        leads={leads}
+        clients={clients}
+        ads={ads}
       />
       <div style={{ flex: 1, padding: page === "knowledge" ? 0 : "40px 56px", overflowY: "auto", minHeight: "100vh" }}>
         {renderPage()}

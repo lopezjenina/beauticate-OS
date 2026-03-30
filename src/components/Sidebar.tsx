@@ -2,11 +2,15 @@
 
 import React from "react";
 import { isSuperAdmin } from "@/lib/auth";
+import { NotificationBell } from "@/components/NotificationBell";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import type { Video, Lead, Client, AdCampaign } from "@/lib/types";
 
 type NavItem = { id: string; label: string; group?: string };
 
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", group: "overview" },
+  { id: "calendar", label: "Calendar", group: "overview" },
   { id: "sales", label: "Sales", group: "pipeline" },
   { id: "onboarding", label: "Onboarding", group: "pipeline" },
   { id: "production", label: "Production", group: "operations" },
@@ -15,16 +19,22 @@ const NAV: NavItem[] = [
   { id: "editors", label: "Editors", group: "team" },
   { id: "ads", label: "Ads", group: "team" },
   { id: "knowledge", label: "Knowledge Base", group: "resources" },
+  { id: "activity", label: "Activity Log", group: "resources" },
 ];
 
 export function Sidebar({
   currentPage, onNavigate, userName, approvalCount, onSignOut,
+  videos = [], leads = [], clients = [], ads = [],
 }: {
   currentPage: string;
   onNavigate: (page: string) => void;
   userName: string;
   approvalCount?: number;
   onSignOut: () => void;
+  videos?: Video[];
+  leads?: Lead[];
+  clients?: Client[];
+  ads?: AdCampaign[];
 }) {
   const navItems = isSuperAdmin(userName)
     ? [...NAV, { id: "users", label: "Users", group: "admin" }]
@@ -36,9 +46,14 @@ export function Sidebar({
       padding: "20px 12px", display: "flex", flexDirection: "column", flexShrink: 0,
       height: "100vh", position: "sticky", top: 0,
     }}>
-      <div style={{ padding: "4px 10px", marginBottom: 28 }}>
+      <div style={{ padding: "4px 10px", marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em" }}>Agency OS</div>
         <div style={{ fontSize: 12, color: "var(--text-ter)", marginTop: 2 }}>{userName}</div>
+      </div>
+
+      {/* Global Search */}
+      <div style={{ padding: "0 4px", marginBottom: 12 }}>
+        <GlobalSearch clients={clients} videos={videos} leads={leads} ads={ads} onNavigate={onNavigate} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
@@ -68,6 +83,9 @@ export function Sidebar({
             )}
           </button>
         ))}
+
+        {/* Notification Bell */}
+        <NotificationBell videos={videos} leads={leads} />
       </div>
 
       <button

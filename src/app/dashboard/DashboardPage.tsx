@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Client, Video, Lead, AdCampaign } from "@/lib/types";
 import { TEAM, EDITORS, WEEKLY_TARGET, INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ADS } from "@/lib/store";
 import { Avatar, Badge, Btn, Stat, PageHeader, ProgressBar, EmptyState } from "@/components/ui";
+import { exportClients, exportLeads, exportVideos, exportCampaigns } from "@/lib/exportCsv";
 
 interface DashboardPageProps {
   clients?: Client[];
@@ -212,7 +213,14 @@ export default function DashboardPage({
       <PageHeader
         title="Executive Dashboard"
         subtitle="At a glance view of agency operations"
-      />
+      >
+        <div style={{ display: "flex", gap: 6 }}>
+          <Btn onClick={() => exportClients(clients)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Clients</Btn>
+          <Btn onClick={() => exportLeads(leads)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Leads</Btn>
+          <Btn onClick={() => exportVideos(videos)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Videos</Btn>
+          <Btn onClick={() => exportCampaigns(ads)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Ads</Btn>
+        </div>
+      </PageHeader>
 
       {/* ─── Main Stats Grid ─── */}
       <div

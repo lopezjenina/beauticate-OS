@@ -129,6 +129,9 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                       style={{ padding: "3px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, fontFamily: "inherit", background: "transparent" }}
                     >
                       <option value="member">Member</option>
+                      <option value="editor">Editor</option>
+                      <option value="videographer">Videographer</option>
+                      <option value="social_manager">Social Manager</option>
                       <option value="admin">Admin</option>
                       <option value="superadmin">Super Admin</option>
                     </select>

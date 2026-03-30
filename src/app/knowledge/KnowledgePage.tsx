@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PageHeader, Btn, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from '@/components/ui';
+import { Btn, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from '@/components/ui';
 import { KB_CATEGORIES, KB_DOCS } from '@/lib/store';
 import type { KBDoc, Attachment } from '@/lib/types';
 
@@ -105,11 +105,13 @@ export default function KnowledgePage({ canDelete = false }: { canDelete?: boole
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#FFFFFF' }}>
       {/* Left Sidebar */}
       <div style={{ width: '280px', borderRight: '1px solid #E3E3E0', display: 'flex', flexDirection: 'column', backgroundColor: '#F7F7F5' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid #E3E3E0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <PageHeader title="Knowledge Base" />
-          <Btn variant="primary" onClick={() => { resetForm(); setShowCreateModal(true); }} style={{ fontSize: 12, padding: '4px 10px' }}>
-            New
-          </Btn>
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid #E3E3E0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: '#1A1A1A' }}>Knowledge Base</h2>
+            <Btn variant="primary" onClick={() => { resetForm(); setShowCreateModal(true); }} style={{ fontSize: 12, padding: '4px 10px' }}>
+              New
+            </Btn>
+          </div>
         </div>
 
         <div style={{ padding: '1.5rem', borderBottom: '1px solid #E3E3E0' }}>

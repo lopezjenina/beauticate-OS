@@ -86,7 +86,7 @@ export function Sidebar({
         ))}
 
         {/* Notification Bell */}
-        <NotificationBell videos={videos} leads={leads} />
+        <NotificationBell videos={videos} leads={leads} onNavigate={onNavigate} />
       </div>
 
       <button

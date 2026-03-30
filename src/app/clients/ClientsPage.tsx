@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { ConfirmModal, PageHeader, Stat, FilterPills } from '@/components/ui';
-import { TEAM } from '@/lib/store';
 import type { Client } from '@/lib/types';
 
 interface ClientsPageProps {
@@ -16,15 +15,29 @@ const STATUS_OPTIONS: { value: Client['status']; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'churned', label: 'Churned' },
 ];
-const WEEKS: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+}
+
+const AVATAR_COLORS = ['#4A90D9', '#7B68EE', '#E8913A', '#50B88E', '#D94A6E', '#6BC5D9', '#9B6BD9', '#D9A84A'];
+
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
 
 export default function ClientsPage({ clients, setClients, canDelete = false }: ClientsPageProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
-
-  const editors = TEAM.filter((m) => m.role === 'editor');
-  const socialManagers = TEAM.filter((m) => m.role === 'social_manager');
 
   const filtered = useMemo(() => {
     let list = clients;
@@ -56,27 +69,6 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
     );
   };
 
-  const teamName = (id: string) => TEAM.find((m) => m.id === id)?.name || id;
-
-  const cellStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    fontSize: 13,
-    borderBottom: '1px solid var(--border)',
-    verticalAlign: 'middle',
-  };
-
-  const headerCellStyle: React.CSSProperties = {
-    ...cellStyle,
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--text-ter)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.04em',
-    background: 'var(--bg-sub)',
-    position: 'sticky' as const,
-    top: 0,
-  };
-
   const inlineSelect: React.CSSProperties = {
     padding: '4px 8px',
     fontSize: 12,
@@ -92,13 +84,36 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
     fontSize: 12,
     border: '1px solid var(--border)',
     borderRadius: 4,
-    width: 80,
+    width: 90,
     fontFamily: 'inherit',
   };
 
+  const statusBadge = (status: string) => {
+    const isActive = status === 'active';
+    return {
+      display: 'inline-block',
+      padding: '2px 8px',
+      fontSize: 11,
+      fontWeight: 500 as const,
+      borderRadius: 10,
+      background: isActive ? '#E8F5E9' : '#FFEBEE',
+      color: isActive ? '#2E7D32' : '#C62828',
+    };
+  };
+
+  const packageBadge = () => ({
+    display: 'inline-block',
+    padding: '2px 8px',
+    fontSize: 11,
+    fontWeight: 500 as const,
+    borderRadius: 10,
+    background: '#F0F0F0',
+    color: '#555',
+  });
+
   return (
     <div>
-      <PageHeader title="Clients" subtitle="All graduated clients from onboarding" />
+      <PageHeader title="Clients" subtitle="Contact directory" />
 
       <div style={{ display: 'flex', gap: 16, marginTop: 24, marginBottom: 24, flexWrap: 'wrap' }}>
         <Stat label="Total Clients" value={totalClients} />
@@ -133,101 +148,144 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
         />
       </div>
 
-      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={headerCellStyle}>Name</th>
-              <th style={headerCellStyle}>Package</th>
-              <th style={headerCellStyle}>Monthly Revenue</th>
-              <th style={headerCellStyle}>Week</th>
-              <th style={headerCellStyle}>Editor</th>
-              <th style={headerCellStyle}>Social Manager</th>
-              <th style={headerCellStyle}>Status</th>
-              <th style={headerCellStyle}>Contact Email</th>
-              <th style={headerCellStyle}>Phone</th>
-              {canDelete && <th style={headerCellStyle}></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={canDelete ? 10 : 9} style={{ ...cellStyle, textAlign: 'center', color: 'var(--text-ter)', padding: 32 }}>
-                  No clients found
-                </td>
-              </tr>
-            ) : (
-              filtered.map((client) => (
-                <tr key={client.id}>
-                  <td style={{ ...cellStyle, fontWeight: 500 }}>{client.name}</td>
-                  <td style={cellStyle}>
-                    <select
-                      value={client.package || ''}
-                      onChange={(e) => handleFieldChange(client.id, 'package', e.target.value)}
-                      style={inlineSelect}
-                    >
-                      <option value="">--</option>
-                      {PACKAGES.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="number"
-                      value={client.monthlyRevenue}
-                      onChange={(e) => handleFieldChange(client.id, 'monthlyRevenue', Number(e.target.value))}
-                      style={inlineInput}
-                    />
-                  </td>
-                  <td style={cellStyle}>
-                    <select
-                      value={client.week}
-                      onChange={(e) => handleFieldChange(client.id, 'week', Number(e.target.value))}
-                      style={inlineSelect}
-                    >
-                      {WEEKS.map((w) => (
-                        <option key={w} value={w}>Week {w}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ ...cellStyle, fontSize: 12 }}>{teamName(client.assignedEditor)}</td>
-                  <td style={{ ...cellStyle, fontSize: 12 }}>{teamName(client.assignedSocialManager)}</td>
-                  <td style={cellStyle}>
-                    <select
-                      value={client.status}
-                      onChange={(e) => handleFieldChange(client.id, 'status', e.target.value)}
-                      style={inlineSelect}
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ ...cellStyle, fontSize: 12, color: 'var(--text-sec)' }}>{client.contactEmail || '-'}</td>
-                  <td style={{ ...cellStyle, fontSize: 12, color: 'var(--text-sec)' }}>{client.phone || '-'}</td>
-                  {canDelete && (
-                    <td style={cellStyle}>
-                      <button
-                        onClick={() => setDeletingClient(client)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--red)',
-                          cursor: 'pointer',
-                          fontSize: 12,
-                          fontWeight: 500,
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </td>
+      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-ter)', padding: 32, fontSize: 13 }}>
+            No clients found
+          </div>
+        ) : (
+          filtered.map((client, idx) => (
+            <div
+              key={client.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: '14px 20px',
+                borderBottom: idx < filtered.length - 1 ? '1px solid var(--border)' : 'none',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FAFAFA'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            >
+              {/* Avatar */}
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '50%',
+                  background: avatarColor(client.name),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#FFF',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {getInitials(client.name)}
+              </div>
+
+              {/* Name + badges */}
+              <div style={{ flex: '1 1 180px', minWidth: 140 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1A1A', marginBottom: 4 }}>
+                  {client.name}
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {client.package && (
+                    <span style={packageBadge()}>{client.package}</span>
                   )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  <span style={statusBadge(client.status)}>
+                    {client.status === 'active' ? 'Active' : 'Churned'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Revenue */}
+              <div style={{ flex: '0 0 120px', textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-ter)', marginBottom: 2 }}>Revenue</div>
+                <input
+                  type="number"
+                  value={client.monthlyRevenue}
+                  onChange={(e) => handleFieldChange(client.id, 'monthlyRevenue', Number(e.target.value))}
+                  style={{ ...inlineInput, textAlign: 'right' }}
+                />
+              </div>
+
+              {/* Package select */}
+              <div style={{ flex: '0 0 110px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-ter)', marginBottom: 2 }}>Package</div>
+                <select
+                  value={client.package || ''}
+                  onChange={(e) => handleFieldChange(client.id, 'package', e.target.value)}
+                  style={inlineSelect}
+                >
+                  <option value="">--</option>
+                  {PACKAGES.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status select */}
+              <div style={{ flex: '0 0 100px' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-ter)', marginBottom: 2 }}>Status</div>
+                <select
+                  value={client.status}
+                  onChange={(e) => handleFieldChange(client.id, 'status', e.target.value)}
+                  style={inlineSelect}
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Contact info */}
+              <div style={{ flex: '1 1 180px', minWidth: 120 }}>
+                <div style={{ fontSize: 12, marginBottom: 2 }}>
+                  {client.contactEmail ? (
+                    <a href={`mailto:${client.contactEmail}`} style={{ color: '#4A90D9', textDecoration: 'none' }}>
+                      {client.contactEmail}
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--text-ter)' }}>-</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12 }}>
+                  {client.phone ? (
+                    <a href={`tel:${client.phone}`} style={{ color: '#4A90D9', textDecoration: 'none' }}>
+                      {client.phone}
+                    </a>
+                  ) : (
+                    <span style={{ color: 'var(--text-ter)' }}>-</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Delete */}
+              {canDelete && (
+                <div style={{ flex: '0 0 auto' }}>
+                  <button
+                    onClick={() => setDeletingClient(client)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--red)',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 500,
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       {deletingClient && (

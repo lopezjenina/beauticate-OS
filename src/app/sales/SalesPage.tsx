@@ -304,73 +304,94 @@ export default function SalesPage({
                   <div
                     key={lead.id}
                     style={{
-                      padding: "16px 14px",
+                      padding: "20px 16px",
                       background: "#FFFFFF",
                       borderRadius: "6px",
                       border: "1px solid #D0D0D0",
                       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
                     }}
                   >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <input
-                        type="text"
-                        placeholder="Company"
-                        value={formData.company}
-                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      />
-                      <input
-                        type="text"
-                        placeholder="Contact Name"
-                        value={formData.contactName}
-                        onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Phone"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      />
-                      <select
-                        value={formData.source}
-                        onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      >
-                        <option value="">Select source</option>
-                        <option value="Instagram DM">Instagram DM</option>
-                        <option value="Referral">Referral</option>
-                        <option value="Website">Website</option>
-                        <option value="Cold outreach">Cold outreach</option>
-                        <option value="LinkedIn">LinkedIn</option>
-                        <option value="Event">Event</option>
-                      </select>
-                      <input
-                        type="number"
-                        placeholder="Revenue"
-                        value={formData.estimatedRevenue}
-                        onChange={(e) => setFormData({ ...formData, estimatedRevenue: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                      />
-                      <textarea
-                        placeholder="Notes"
-                        rows={2}
-                        value={formData.notes}
-                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" }}
-                      />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Company</div>
+                        <input
+                          type="text"
+                          placeholder="Company"
+                          value={formData.company}
+                          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Contact Name</div>
+                        <input
+                          type="text"
+                          placeholder="Contact Name"
+                          value={formData.contactName}
+                          onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Email</div>
+                        <input
+                          type="email"
+                          placeholder="Email"
+                          value={formData.email}
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Phone</div>
+                        <input
+                          type="tel"
+                          placeholder="Phone"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Source</div>
+                        <select
+                          value={formData.source}
+                          onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        >
+                          <option value="">Select source</option>
+                          <option value="Instagram DM">Instagram DM</option>
+                          <option value="Referral">Referral</option>
+                          <option value="Website">Website</option>
+                          <option value="Cold outreach">Cold outreach</option>
+                          <option value="LinkedIn">LinkedIn</option>
+                          <option value="Event">Event</option>
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Revenue</div>
+                        <input
+                          type="number"
+                          placeholder="Revenue"
+                          value={formData.estimatedRevenue}
+                          onChange={(e) => setFormData({ ...formData, estimatedRevenue: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Notes</div>
+                        <textarea
+                          placeholder="Notes"
+                          rows={3}
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" }}
+                        />
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <Btn variant="primary" onClick={handleInlineSave} style={{ fontSize: 11, padding: "4px 12px" }}>Save</Btn>
-                      <Btn variant="ghost" onClick={handleInlineCancel} style={{ fontSize: 11, padding: "4px 12px" }}>Cancel</Btn>
+                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <Btn variant="primary" onClick={handleInlineSave} style={{ fontSize: 11, padding: "6px 14px" }}>Save</Btn>
+                      <Btn variant="ghost" onClick={handleInlineCancel} style={{ fontSize: 11, padding: "6px 14px" }}>Cancel</Btn>
                     </div>
                   </div>
                 ) : (

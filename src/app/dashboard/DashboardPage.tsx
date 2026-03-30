@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Client, Video, Lead, AdCampaign } from "@/lib/types";
 import { TEAM, EDITORS, WEEKLY_TARGET, INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ADS } from "@/lib/store";
@@ -54,6 +54,7 @@ export default function DashboardPage({
   ads = INIT_ADS,
 }: DashboardPageProps) {
   const today = new Date("2026-03-30");
+  const [periodFilter, setPeriodFilter] = useState("month");
 
   // ─── Core Stats ───
   const activeClients = useMemo(() => clients.filter((c) => c.status === "active").length, [clients]);
@@ -345,28 +346,23 @@ export default function DashboardPage({
           <p style={{ fontSize: 13, color: "#6B6B6B", margin: "4px 0 0" }}>Agency operations at a glance</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Period selector (visual) */}
-          <div
+          {/* Period selector */}
+          <select
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value)}
             style={{
-              ...cardStyle,
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              color: PRIMARY,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              cursor: "default",
+              padding: "6px 16px", borderRadius: 20, border: "1px solid #E8E8E6",
+              background: "#FFF", color: "#5B5FC7", fontSize: 13, fontWeight: 500,
+              cursor: "pointer", fontFamily: "inherit", appearance: "none",
+              paddingRight: 28, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235B5FC7' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+              backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            This Month
-          </div>
+            <option value="month">This Month</option>
+            <option value="week">This Week</option>
+            <option value="quarter">This Quarter</option>
+            <option value="year">This Year</option>
+          </select>
           <Btn onClick={() => exportClients(clients)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Clients</Btn>
           <Btn onClick={() => exportLeads(leads)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Leads</Btn>
           <Btn onClick={() => exportVideos(videos)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Videos</Btn>

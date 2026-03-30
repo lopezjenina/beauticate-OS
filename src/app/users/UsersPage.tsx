@@ -11,14 +11,17 @@ interface UsersPageProps {
 
 const PAGE_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
+  calendar: "Calendar",
   sales: "Sales",
   onboarding: "Onboarding",
+  clients: "Clients",
   production: "Production",
   approvals: "Approvals",
   publishing: "Publishing",
   editors: "Editors",
   ads: "Ads",
   knowledge: "Knowledge Base",
+  activity: "Activity Log",
 };
 
 export default function UsersPage({ users, setUsers }: UsersPageProps) {

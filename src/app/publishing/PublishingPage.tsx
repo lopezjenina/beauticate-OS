@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { Video } from "@/lib/types";
 import { TEAM, INIT_CLIENTS } from "@/lib/store";
 import { PageHeader, Badge, Btn, Avatar, Stat } from "@/components/ui";
@@ -17,6 +17,9 @@ export default function PublishingPage({ videos, setVideos }: Props) {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(
     new Set([1, 2, 3, 4])
   );
+
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
 
   const publishingVideos = videos.filter(
     (v) => v.editingStatus === "approved" && v.sentToGuido === true
@@ -455,26 +458,19 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                   <button
                                     onClick={() => toggleCaption(video.id)}
                                     style={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 4,
-                                      padding: "4px 10px",
-                                      borderRadius: 12,
+                                      padding: "4px 14px",
+                                      borderRadius: 20,
+                                      fontSize: 12,
+                                      fontWeight: 500,
                                       border: "none",
+                                      background: video.captionWritten ? "#EAF5F2" : "#F7F7F5",
+                                      color: video.captionWritten ? "#4DAB9A" : "#9B9B9B",
                                       cursor: "pointer",
-                                      fontSize: 11,
-                                      fontWeight: 600,
                                       fontFamily: "inherit",
-                                      backgroundColor: video.captionWritten
-                                        ? "#E6F4EA"
-                                        : "#F0F0EE",
-                                      color: video.captionWritten
-                                        ? "#1E7E34"
-                                        : "#9B9B9B",
-                                      transition: "all 0.15s",
+                                      whiteSpace: "nowrap" as const,
                                     }}
                                   >
-                                    {video.captionWritten ? "✓ Done" : "Pending"}
+                                    {video.captionWritten ? "\u2713 Done" : "Pending"}
                                   </button>
                                 </td>
 
@@ -483,26 +479,19 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                   <button
                                     onClick={() => toggleThumbnail(video.id)}
                                     style={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 4,
-                                      padding: "4px 10px",
-                                      borderRadius: 12,
+                                      padding: "4px 14px",
+                                      borderRadius: 20,
+                                      fontSize: 12,
+                                      fontWeight: 500,
                                       border: "none",
+                                      background: video.thumbnailDone ? "#EAF5F2" : "#F7F7F5",
+                                      color: video.thumbnailDone ? "#4DAB9A" : "#9B9B9B",
                                       cursor: "pointer",
-                                      fontSize: 11,
-                                      fontWeight: 600,
                                       fontFamily: "inherit",
-                                      backgroundColor: video.thumbnailDone
-                                        ? "#E6F4EA"
-                                        : "#F0F0EE",
-                                      color: video.thumbnailDone
-                                        ? "#1E7E34"
-                                        : "#9B9B9B",
-                                      transition: "all 0.15s",
+                                      whiteSpace: "nowrap" as const,
                                     }}
                                   >
-                                    {video.thumbnailDone ? "✓ Done" : "Pending"}
+                                    {video.thumbnailDone ? "\u2713 Done" : "Pending"}
                                   </button>
                                 </td>
 
@@ -589,38 +578,62 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 </td>
 
                                 {/* Notes */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <input
-                                    type="text"
-                                    value={publishingNote}
-                                    onChange={(e) => {
-                                      const text = e.target.value;
-                                      setVideos((prev) =>
-                                        prev.map((v) => {
-                                          if (v.id !== video.id) return v;
-                                          const otherNotes = (v.notes || []).filter(n => n.from !== "publishing");
-                                          const updatedNotes = text
-                                            ? [...otherNotes, { from: "publishing", date: new Date().toISOString().split("T")[0], text }]
-                                            : otherNotes;
-                                          return { ...v, notes: updatedNotes };
-                                        })
-                                      );
-                                    }}
-                                    placeholder="Add note..."
-                                    style={{
-                                      padding: "5px 8px",
-                                      fontSize: 12,
-                                      border: "1px solid #E3E3E0",
-                                      borderRadius: 6,
-                                      fontFamily: "inherit",
-                                      color: "#1A1A1A",
-                                      background: "#FFFFFF",
-                                      outline: "none",
-                                      minWidth: 120,
-                                      width: "100%",
-                                      boxSizing: "border-box" as const,
-                                    }}
-                                  />
+                                <td style={{ padding: "14px 16px", minWidth: 140 }}>
+                                  {expandedNoteId === video.id ? (
+                                    <textarea
+                                      ref={noteRef}
+                                      autoFocus
+                                      rows={3}
+                                      defaultValue={publishingNote}
+                                      onBlur={(e) => {
+                                        const text = e.target.value;
+                                        setVideos((prev) =>
+                                          prev.map((v) => {
+                                            if (v.id !== video.id) return v;
+                                            const otherNotes = (v.notes || []).filter(n => n.from !== "publishing");
+                                            const updatedNotes = text
+                                              ? [...otherNotes, { from: "publishing", date: new Date().toISOString().split("T")[0], text }]
+                                              : otherNotes;
+                                            return { ...v, notes: updatedNotes };
+                                          })
+                                        );
+                                        setExpandedNoteId(null);
+                                      }}
+                                      style={{
+                                        padding: "5px 8px",
+                                        fontSize: 12,
+                                        border: "1px solid #4DAB9A",
+                                        borderRadius: 6,
+                                        fontFamily: "inherit",
+                                        color: "#1A1A1A",
+                                        background: "#FFFFFF",
+                                        outline: "none",
+                                        width: "100%",
+                                        boxSizing: "border-box" as const,
+                                        resize: "none",
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      onClick={() => setExpandedNoteId(video.id)}
+                                      style={{
+                                        padding: "5px 8px",
+                                        fontSize: 12,
+                                        color: publishingNote ? "#1A1A1A" : "#9B9B9B",
+                                        cursor: "pointer",
+                                        borderRadius: 6,
+                                        border: "1px solid transparent",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                        maxWidth: 180,
+                                      }}
+                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#E3E3E0"; }}
+                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "transparent"; }}
+                                    >
+                                      {publishingNote || "Add note..."}
+                                    </div>
+                                  )}
                                 </td>
                               </tr>
                             );

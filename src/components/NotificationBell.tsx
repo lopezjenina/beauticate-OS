@@ -6,6 +6,7 @@ import { Video, Lead } from '@/lib/types';
 interface NotificationBellProps {
   videos: Video[];
   leads: Lead[];
+  onNavigate?: (page: string) => void;
 }
 
 export type Notification = {
@@ -14,8 +15,18 @@ export type Notification = {
   message: string;
 };
 
-export function NotificationBell({ videos, leads }: NotificationBellProps) {
+const notificationPageMap: Record<string, string> = {
+  n1: "approvals",
+  n2: "production",
+  n3: "production",
+  n4: "production",
+  n5: "sales",
+  n6: "publishing",
+};
+
+export function NotificationBell({ videos, leads, onNavigate }: NotificationBellProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,6 +83,11 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
     return notifs;
   }, [videos, leads]);
 
+  const visibleNotifications = useMemo(
+    () => notifications.filter(n => !dismissedIds.has(n.id)),
+    [notifications, dismissedIds]
+  );
+
   const typeColors: Record<string, string> = {
     warning: "#CB7F2C",
     info: "#2383E2",
@@ -97,12 +113,12 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
         }}
       >
         <span>Notifications</span>
-        {notifications.length > 0 && (
+        {visibleNotifications.length > 0 && (
           <span style={{
             fontSize: 11, fontWeight: 600, background: "#EB5757", color: "#FFF",
             borderRadius: 10, padding: "1px 7px", minWidth: 18, textAlign: "center",
           }}>
-            {notifications.length}
+            {visibleNotifications.length}
           </span>
         )}
       </button>
@@ -115,21 +131,26 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
           zIndex: 100, maxHeight: 400, overflow: "auto",
         }}>
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #E3E3E0", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Notifications ({notifications.length})</span>
-            <button onClick={() => { setShowDropdown(false); }} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Dismiss all</button>
+            <span>Notifications ({visibleNotifications.length})</span>
+            <button onClick={() => { setDismissedIds(prev => { const next = new Set(prev); visibleNotifications.forEach(n => next.add(n.id)); return next; }); setShowDropdown(false); }} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Dismiss all</button>
           </div>
-          {notifications.length === 0 ? (
+          {visibleNotifications.length === 0 ? (
             <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "#9B9B9B" }}>
               All caught up!
             </div>
           ) : (
-            notifications.map(n => (
+            visibleNotifications.map(n => (
               <button key={n.id} style={{
                 padding: "10px 16px", borderBottom: "1px solid #EBEBEA",
                 display: "flex", alignItems: "center", gap: 10,
                 width: "100%", border: "none", background: "transparent",
                 cursor: "pointer", fontFamily: "inherit", textAlign: "left",
               }}
+                onClick={() => {
+                  const page = notificationPageMap[n.id];
+                  if (page && onNavigate) onNavigate(page);
+                  setShowDropdown(false);
+                }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F7F7F5"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
               >

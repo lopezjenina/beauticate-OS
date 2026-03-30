@@ -51,7 +51,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
   };
 
   const handleSaveUser = () => {
-    if (!formData.username || !formData.email || !formData.password) return;
+    if (!formData.username || !formData.password) return;
 
     if (editingUser) {
       setUsers((prev) => prev.map((u) => u.id === editingUser.id ? {

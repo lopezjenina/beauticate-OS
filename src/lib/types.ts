@@ -33,7 +33,7 @@ export type TeamMember = {
   id: string;
   name: string;
   initials: string;
-  role: "editor" | "social_manager" | "creative_director" | "ads_manager";
+  role: "editor" | "videographer" | "social_manager" | "creative_director" | "admin";
   weeklyVideoCap: number;
 };
 

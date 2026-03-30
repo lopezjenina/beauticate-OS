@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Btn, PageHeader, Badge, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from '@/components/ui';
+import { Btn, PageHeader, Badge, ConfirmModal, FileUploadArea, AttachmentList, LinkInput, showToast } from '@/components/ui';
 import { AdCampaign, Client, Attachment } from '@/lib/types';
 
 type StatusFilter = 'all' | 'active' | 'paused' | 'draft' | 'ended';
@@ -128,6 +128,7 @@ export default function AdsPage({
           : ad
       )
     );
+    showToast(`"${editRowData.campaignName}" saved`, "success");
     setEditingRowId(null);
     setEditRowData(null);
   };
@@ -152,6 +153,7 @@ export default function AdsPage({
       attachments: formAttachments.length > 0 ? formAttachments : undefined,
     };
     setAds((prev) => [...prev, newCampaign]);
+    showToast(`"${formData.campaignName}" created`, "success");
     resetForm();
   };
 
@@ -636,6 +638,7 @@ export default function AdsPage({
           title="Delete Campaign"
           message={`This will permanently remove "${deletingCampaign.campaignName}" and its data.`}
           onConfirm={() => {
+            showToast(`"${deletingCampaign.campaignName}" deleted`, "error");
             setAds((prev) => prev.filter((a) => a.id !== deletingCampaign!.id));
             setDeletingCampaign(null);
           }}

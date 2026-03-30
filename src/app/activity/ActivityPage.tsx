@@ -5,11 +5,11 @@ import { PageHeader, Badge, FilterPills } from '@/components/ui';
 import { getActivityLog, ActivityEntry } from '@/lib/activityLog';
 
 export default function ActivityPage() {
-  const [log, setLog] = useState<ActivityEntry[]>([]);
+  const [log, setLog] = useState<ActivityEntry[]>(() => getActivityLog());
   const [filterEntity, setFilterEntity] = useState<string | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setLog(getActivityLog()), 1000);
+    const interval = setInterval(() => setLog(getActivityLog()), 2000);
     return () => clearInterval(interval);
   }, []);
 

@@ -10,18 +10,18 @@ export function LoginPage({
   onLogin: (user: { name: string; email: string; role: string }) => void;
   users: AppUser[];
 }) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [hoverButton, setHoverButton] = useState(false);
 
   const handleLogin = () => {
-    const found = users.find((u) => u.email === email && u.password === pass);
+    const found = users.find((u) => u.username.toLowerCase() === username.toLowerCase() && u.password === pass);
     if (found) {
       onLogin({ name: found.username, email: found.email, role: found.role });
-    } else if (email && pass) {
-      setError("Invalid email or password.");
+    } else if (username && pass) {
+      setError("Invalid username or password.");
     } else {
       setError("Please enter your credentials.");
     }
@@ -209,16 +209,16 @@ export function LoginPage({
                   marginBottom: 6,
                 }}
               >
-                Email
+                Username
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onFocus={() => setFocusedField("email")}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onFocus={() => setFocusedField("username")}
                 onBlur={() => setFocusedField(null)}
-                placeholder="you@company.com"
-                style={inputStyle("email")}
+                placeholder="Enter your username"
+                style={inputStyle("username")}
               />
             </div>
 

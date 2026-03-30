@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Lead, Attachment } from "@/lib/types";
 import { INIT_LEADS } from "@/lib/store";
 import { logActivity } from "@/lib/activityLog";
-import { Avatar, Badge, Btn, PageHeader, FilterPills, EmptyState, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from "@/components/ui";
+import { Avatar, Badge, Btn, PageHeader, FilterPills, EmptyState, ConfirmModal, FileUploadArea, AttachmentList, LinkInput, showToast } from "@/components/ui";
 
 interface SalesPageProps {
   leads?: Lead[];
@@ -138,6 +138,7 @@ export default function SalesPage({
     setInternalLeads(updated);
     setLeads(() => updated);
     logActivity({ user: "Admin", action: "deleted", entity: "lead", entityName: deletingLead.company });
+    showToast(`"${deletingLead.company}" deleted`, "error");
     setDeletingLead(null);
   };
 
@@ -183,6 +184,7 @@ export default function SalesPage({
       setLeads(() => updated);
     }
     logActivity({ user: "Admin", action: editingLead ? "updated" : "created", entity: "lead", entityName: formData.company });
+    showToast(editingLead ? `"${formData.company}" updated` : `"${formData.company}" created`, "success");
     resetForm();
   };
 

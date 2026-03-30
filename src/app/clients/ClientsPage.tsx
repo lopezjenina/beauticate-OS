@@ -3,14 +3,13 @@
 import React, { useState, useMemo } from 'react';
 import { ConfirmModal, PageHeader, Stat, FilterPills } from '@/components/ui';
 import type { Client } from '@/lib/types';
+import { getPackageNames } from '@/app/packages/PackagesPage';
 
 interface ClientsPageProps {
   clients: Client[];
   setClients: (fn: (prev: Client[]) => Client[]) => void;
   canDelete?: boolean;
 }
-
-const PACKAGES = ['Starter', 'Growth', 'Pro', 'Enterprise'];
 const STATUS_OPTIONS: { value: Client['status']; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'churned', label: 'Churned' },
@@ -359,7 +358,7 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
                             style={inlineSelect}
                           >
                             <option value="">--</option>
-                            {PACKAGES.map((p) => (
+                            {getPackageNames().map((p) => (
                               <option key={p} value={p}>{p}</option>
                             ))}
                           </select>

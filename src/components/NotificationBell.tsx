@@ -36,6 +36,8 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
     return new Set();
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem("agencyos_dismissed_notifs", JSON.stringify([...dismissedIds]));
@@ -50,6 +52,13 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
+
+  useEffect(() => {
+    if (showDropdown && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.top, left: rect.right + 8 });
+    }
   }, [showDropdown]);
 
   const notifications = useMemo(() => {
@@ -115,6 +124,7 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       <button
+        ref={buttonRef}
         onClick={() => setShowDropdown(!showDropdown)}
         style={{
           width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 6,
@@ -135,12 +145,12 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
         )}
       </button>
 
-      {showDropdown && (
+      {showDropdown && dropdownPos && (
         <div style={{
-          position: "absolute", left: "100%", top: 0, marginLeft: 8,
+          position: "fixed", top: dropdownPos.top, left: dropdownPos.left,
           width: 320, background: "#FFF", border: "1px solid #E3E3E0",
           borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          zIndex: 100, maxHeight: 400, overflow: "auto",
+          zIndex: 1200, maxHeight: 400, overflow: "auto",
         }}>
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #E3E3E0", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Notifications ({visibleNotifications.length})</span>

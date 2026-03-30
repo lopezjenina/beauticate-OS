@@ -22,6 +22,7 @@ import {
 } from "@/lib/store";
 import { logActivity } from "@/lib/activityLog";
 import { INIT_USERS, isAdmin, isSuperAdmin } from "@/lib/auth";
+import { ToastContainer, CelebrationModal, showToast } from "@/components/ui";
 import type { AppUser } from "@/lib/auth";
 import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/types";
 
@@ -42,7 +43,16 @@ export default function App() {
     }
   }, [user]);
 
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("agencyos_user");
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (!["superadmin", "admin"].includes(u.role)) return "production";
+      }
+    }
+    return "dashboard";
+  });
 
   /* ─── Shared State ─── */
   const [clients, setClients] = useState<Client[]>(INIT_CLIENTS);
@@ -51,21 +61,13 @@ export default function App() {
   const [onboardingClients, setOnboardingClients] = useState<OnboardingClient[]>(INIT_ONBOARDING);
   const [ads, setAds] = useState<AdCampaign[]>(INIT_ADS);
 
+  const [celebration, setCelebration] = useState<{ title: string; message: string } | null>(null);
+
   /* ─── Admin check ─── */
   const canDelete = user ? isAdmin(user.name) : false;
   const isSuperAdminUser = user ? isSuperAdmin(user.name) : false;
 
-  /* ─── Derive team from Users ─── */
-  const editorUsers = useMemo(() =>
-    users.filter(u => u.role === "editor" || u.role === "videographer")
-      .map(u => ({ id: u.id, name: u.username })),
-    [users]
-  );
-  const socialManagerUsers = useMemo(() =>
-    users.filter(u => u.role === "social_manager")
-      .map(u => ({ id: u.id, name: u.username })),
-    [users]
-  );
+
 
   /* ─── Gate: Sales → Onboarding ─── */
   const handleClosedWon = useCallback((lead: Lead) => {
@@ -89,6 +91,7 @@ export default function App() {
     };
     setOnboardingClients((prev) => [...prev, newOb]);
     if (user) logActivity({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
+    setCelebration({ title: "New Deal Closed!", message: `Congratulations! ${lead.company} is now a client. Time to start onboarding!` });
   }, [user]);
 
   /* ─── Gate: Onboarding → Production ─── */
@@ -121,6 +124,7 @@ export default function App() {
     setClients((prev) => [...prev, newClient]);
     setOnboardingClients((prev) => prev.filter((c) => c.id !== ob.id));
     if (user) logActivity({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
+    setCelebration({ title: `${ob.name} is Live!`, message: `${ob.name} has moved to production in Week ${assignedWeek}. Let's create amazing content!` });
   }, [clients, user]);
 
   /* ─── Derived counts ─── */
@@ -128,7 +132,13 @@ export default function App() {
 
   if (!user) return <LoginPage onLogin={setUser} users={users} />;
 
+  const currentUserPerms = users.find(u => u.username === user.name)?.permissions;
+
   const renderPage = () => {
+    // Guard: redirect if user lacks permission for this page
+    if (currentUserPerms && currentUserPerms[page] === false) {
+      return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} />;
+    }
     switch (page) {
       case "dashboard":
         return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
@@ -142,19 +152,17 @@ export default function App() {
             onboardingClients={onboardingClients}
             setOnboardingClients={setOnboardingClients}
             onMoveToProduction={handleMoveToProduction}
-            editors={editorUsers}
-            socialManagers={socialManagerUsers}
             canDelete={canDelete}
           />
         );
       case "clients":
         return <ClientsPage clients={clients} setClients={setClients} canDelete={canDelete} />;
       case "production":
-        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} editors={editorUsers} canDelete={canDelete} />;
+        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} />;
       case "approvals":
         return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} />;
       case "publishing":
-        return <PublishingPage videos={videos} setVideos={setVideos} />;
+        return <PublishingPage videos={videos} setVideos={setVideos} userName={user.name} />;
       case "editors":
         return <EditorsPage videos={videos} />;
       case "ads":
@@ -185,10 +193,15 @@ export default function App() {
         leads={leads}
         clients={clients}
         ads={ads}
+        permissions={users.find(u => u.username === user.name)?.permissions}
       />
       <div style={{ flex: 1, padding: page === "knowledge" ? 0 : "40px 56px", overflowY: "auto", minHeight: "100vh" }}>
         {renderPage()}
       </div>
+      <ToastContainer />
+      {celebration && (
+        <CelebrationModal title={celebration.title} message={celebration.message} onClose={() => setCelebration(null)} />
+      )}
     </div>
   );
 }

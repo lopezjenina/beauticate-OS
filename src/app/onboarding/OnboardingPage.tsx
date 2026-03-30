@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Avatar, Badge, Btn, ProgressBar, Checkbox, PageHeader, EmptyState, ConfirmModal } from '@/components/ui';
 import { OnboardingClient } from '@/lib/types';
 import { TEAM } from '@/lib/store';
+import { getPackageNames } from '@/app/packages/PackagesPage';
 
 interface OnboardingPageProps {
   onboardingClients: OnboardingClient[];
@@ -103,6 +104,7 @@ export default function OnboardingPage({
   const getTeamMembersForRole = (role: string) => {
     if (role === "editor" && editorsProp) return editorsProp;
     if (role === "social_manager" && smProp) return smProp;
+    if (role === "editor") return TEAM.filter((member) => member.role === "editor" || member.role === "videographer");
     return TEAM.filter((member) => member.role === role);
   };
 
@@ -216,10 +218,9 @@ export default function OnboardingPage({
                           onChange={(e) => handleFieldChange(client.id, "package", e.target.value)}
                           style={inputStyle}
                         >
-                          <option value="Starter">Starter</option>
-                          <option value="Growth">Growth</option>
-                          <option value="Pro">Pro</option>
-                          <option value="Enterprise">Enterprise</option>
+                          {getPackageNames().map(pkg => (
+                            <option key={pkg} value={pkg}>{pkg}</option>
+                          ))}
                         </select>
                       </div>
                       <div>
@@ -413,6 +414,8 @@ export default function OnboardingPage({
             setMovingClient(null);
           }}
           onCancel={() => setMovingClient(null)}
+          confirmLabel="Move to Production"
+          variant="primary"
         />
       )}
     </div>

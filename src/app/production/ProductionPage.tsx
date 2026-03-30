@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Avatar, Badge, Btn, Checkbox, ConfirmModal, PageHeader, Stat } from '@/components/ui';
+import { Avatar, Badge, Btn, Checkbox, ConfirmModal, PageHeader, Stat, showToast } from '@/components/ui';
 import { Client, Video } from '@/lib/types';
 import { TEAM, EDITORS } from '@/lib/store';
 
@@ -55,7 +55,7 @@ export default function ProductionPage({
   canDelete,
   editors: editorsProp,
 }: ProductionPageProps) {
-  const editorList = editorsProp || EDITORS.map(e => ({ id: e.id, name: e.name }));
+  const editorList = editorsProp || TEAM.filter(t => t.role === "editor" || t.role === "videographer").map(e => ({ id: e.id, name: e.name }));
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [noteModalVideoId, setNoteModalVideoId] = useState<string | null>(null);
@@ -144,7 +144,7 @@ export default function ProductionPage({
 
   const getAssignedEditor = (editorId?: string) => {
     if (!editorId) return null;
-    return TEAM.find((member) => member.id === editorId && member.role === 'editor');
+    return TEAM.find((member) => member.id === editorId && (member.role === 'editor' || member.role === 'videographer'));
   };
 
   const toggleWeekExpanded = (week: number) => {
@@ -188,6 +188,7 @@ export default function ProductionPage({
       notes: [],
     };
     setVideos((prev) => [...prev, newVideo]);
+    showToast(`"${videoFormData.title}" created`, "success");
     setShowAddVideoModal(false);
     setSelectedClientForVideo(null);
     setVideoFormData({ title: "", platform: "Instagram", shootDate: "", dueDate: "" });
@@ -522,7 +523,9 @@ export default function ProductionPage({
                                   ))}
                                 </select>
                               ) : (
-                                <span style={{ color: '#9B9B9B', fontSize: '13px' }}>Unassigned</span>
+                                <span style={{ fontSize: '13px', color: client.assignedEditor ? '#1A1A1A' : '#9B9B9B' }}>
+                                  {editorList.find(e => e.id === client.assignedEditor)?.name || 'Unassigned'}
+                                </span>
                               )}
                             </td>
 
@@ -811,6 +814,7 @@ export default function ProductionPage({
           confirmLabel="Delete"
           variant="danger"
           onConfirm={() => {
+            showToast(`"${deletingVideo.title}" deleted`, "error");
             setVideos(prev => prev.filter(v => v.id !== deletingVideo.id));
             setDeletingVideo(null);
           }}

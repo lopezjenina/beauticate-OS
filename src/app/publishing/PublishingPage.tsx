@@ -3,14 +3,16 @@
 import React, { useMemo, useState } from "react";
 import { Video } from "@/lib/types";
 import { TEAM, INIT_CLIENTS } from "@/lib/store";
-import { PageHeader, Badge, Btn, Avatar, Stat } from "@/components/ui";
+import { PageHeader, Badge, Btn, Avatar, Stat, showToast } from "@/components/ui";
+import { logActivity } from "@/lib/activityLog";
 
 interface Props {
   videos: Video[];
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
+  userName?: string;
 }
 
-export default function PublishingPage({ videos, setVideos }: Props) {
+export default function PublishingPage({ videos, setVideos, userName }: Props) {
   const today = new Date("2026-03-30");
   const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -94,23 +96,35 @@ export default function PublishingPage({ videos, setVideos }: Props) {
 
   const toggleCaption = (videoId: string) => {
     const video = videos.find((v) => v.id === videoId);
-    if (video) updateVideo(videoId, { captionWritten: !video.captionWritten });
+    if (video) {
+      updateVideo(videoId, { captionWritten: !video.captionWritten });
+      logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Caption marked ${!video.captionWritten ? "done" : "pending"}` });
+    }
   };
 
   const toggleThumbnail = (videoId: string) => {
     const video = videos.find((v) => v.id === videoId);
-    if (video) updateVideo(videoId, { thumbnailDone: !video.thumbnailDone });
+    if (video) {
+      updateVideo(videoId, { thumbnailDone: !video.thumbnailDone });
+      logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Thumbnail marked ${!video.thumbnailDone ? "done" : "pending"}` });
+    }
   };
 
   const setScheduledDate = (videoId: string, dateStr: string) => {
+    const video = videos.find((v) => v.id === videoId);
     updateVideo(videoId, { scheduledDate: dateStr });
+    if (video) logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Scheduled date set to ${dateStr}` });
   };
 
   const setPostingStatus = (
     videoId: string,
     status: "pending" | "scheduled" | "posted"
   ) => {
+    const video = videos.find((v) => v.id === videoId);
     updateVideo(videoId, { postingStatus: status });
+    if (video) logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Posting status → ${status}` });
+    if (status === "posted") showToast(`"${video?.title || "Video"}" marked as posted`, "success");
+    else if (status === "scheduled") showToast(`"${video?.title || "Video"}" scheduled`, "info");
   };
 
   const toggleWeekExpanded = (week: number) => {
@@ -411,6 +425,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                             const current = (video.platform || "").split(",").map(s => s.trim()).filter(Boolean);
                                             const updated = isActive ? current.filter(x => x !== p) : [...current, p];
                                             handleVideoUpdate(video.id, "platform", updated.join(", "));
+                                            logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `${isActive ? "Removed" : "Added"} platform ${p}` });
                                           }}
                                           style={{
                                             padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
@@ -679,7 +694,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                   <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} style={{ width: "100%", padding: "10px 12px", border: "1px solid #E3E3E0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                     <button onClick={() => { setNoteModalVideoId(null); setNoteText(""); }} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "transparent", color: "#6B6B6B", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                    <button onClick={() => { if (!noteText.trim()) return; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: "Publishing", date: new Date().toISOString(), text: noteText.trim() }] } : v)); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
+                    <button onClick={() => { if (!noteText.trim()) return; const vid = videos.find(v => v.id === noteModalVideoId); setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: userName || "Publishing", date: new Date().toISOString(), text: noteText.trim() }] } : v)); logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: vid?.title || "Untitled", details: "Added publishing note" }); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
                   </div>
                 </div>
               </div>

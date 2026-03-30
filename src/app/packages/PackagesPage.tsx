@@ -13,12 +13,26 @@ export type ServicePackage = {
   isActive: boolean;
 };
 
-const INIT_PACKAGES: ServicePackage[] = [
+export const INIT_PACKAGES: ServicePackage[] = [
   { id: "pkg-1", name: "Starter", description: "Basic video content package", price: 1500, billingCycle: "monthly", features: ["4 videos/month", "1 platform", "Basic editing"], isActive: true },
   { id: "pkg-2", name: "Growth", description: "Scale your content presence", price: 2500, billingCycle: "monthly", features: ["8 videos/month", "2 platforms", "Advanced editing", "Thumbnail design"], isActive: true },
   { id: "pkg-3", name: "Pro", description: "Full content management", price: 4000, billingCycle: "monthly", features: ["12 videos/month", "3 platforms", "Premium editing", "Thumbnail design", "Caption writing", "Strategy calls"], isActive: true },
   { id: "pkg-4", name: "Enterprise", description: "Custom solution for large brands", price: 7500, billingCycle: "monthly", features: ["20+ videos/month", "All platforms", "Dedicated editor", "Priority support", "Ad management", "Monthly reporting"], isActive: true },
 ];
+
+/** Read active package names from sessionStorage (or fallback to defaults) */
+export function getPackageNames(): string[] {
+  if (typeof window !== "undefined") {
+    const saved = sessionStorage.getItem("agencyos_packages");
+    if (saved) {
+      try {
+        const pkgs: ServicePackage[] = JSON.parse(saved);
+        return pkgs.filter(p => p.isActive).map(p => p.name);
+      } catch { /* fallback */ }
+    }
+  }
+  return INIT_PACKAGES.filter(p => p.isActive).map(p => p.name);
+}
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState<ServicePackage[]>(() => {

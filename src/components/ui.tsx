@@ -190,6 +190,103 @@ export function ConfirmModal({
   );
 }
 
+/* ─── Toast Notification ─── */
+type ToastType = "success" | "error" | "info";
+type ToastItem = { id: number; message: string; type: ToastType };
+let toastListeners: ((t: ToastItem[]) => void)[] = [];
+let toasts: ToastItem[] = [];
+let toastId = 0;
+
+export function showToast(message: string, type: ToastType = "success") {
+  const item: ToastItem = { id: ++toastId, message, type };
+  toasts = [...toasts, item];
+  toastListeners.forEach(fn => fn(toasts));
+  setTimeout(() => {
+    toasts = toasts.filter(t => t.id !== item.id);
+    toastListeners.forEach(fn => fn(toasts));
+  }, 3000);
+}
+
+export function ToastContainer() {
+  const [items, setItems] = React.useState<ToastItem[]>([]);
+  React.useEffect(() => {
+    toastListeners.push(setItems);
+    return () => { toastListeners = toastListeners.filter(fn => fn !== setItems); };
+  }, []);
+  if (items.length === 0) return null;
+  const colors: Record<ToastType, { bg: string; border: string; text: string }> = {
+    success: { bg: "#F0FAF6", border: "#4DAB9A", text: "#1A6B5A" },
+    error: { bg: "#FDF2F2", border: "#EB5757", text: "#C53030" },
+    info: { bg: "#EEF4FF", border: "#2383E2", text: "#1A56A8" },
+  };
+  return (
+    <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8 }}>
+      {items.map(t => {
+        const c = colors[t.type];
+        return (
+          <div key={t.id} style={{
+            padding: "10px 20px", borderRadius: 8, background: c.bg, borderLeft: `4px solid ${c.border}`,
+            color: c.text, fontSize: 13, fontWeight: 500, boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+            animation: "slideIn 0.25s ease-out", minWidth: 240, maxWidth: 380,
+          }}>
+            {t.message}
+          </div>
+        );
+      })}
+      <style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }`}</style>
+    </div>
+  );
+}
+
+/* ─── Celebration Modal (Confetti) ─── */
+export function CelebrationModal({ title, message, onClose }: { title: string; message: string; onClose: () => void }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = 480; canvas.height = 320;
+    const colors = ["#4DAB9A", "#5B5FC7", "#EB5757", "#CB7F2C", "#2383E2", "#E91E8B", "#F5A623"];
+    const particles = Array.from({ length: 80 }, () => ({
+      x: Math.random() * 480, y: Math.random() * -320,
+      w: 4 + Math.random() * 6, h: 8 + Math.random() * 8,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 3, vy: 1.5 + Math.random() * 3,
+      rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.15,
+    }));
+    let raf: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, 480, 320);
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        if (p.y > 340) { p.y = -10; p.x = Math.random() * 480; }
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200 }} onClick={onClose}>
+      <div style={{ background: "#FFF", borderRadius: 16, overflow: "hidden", width: 480, maxWidth: "90vw", textAlign: "center", boxShadow: "0 16px 48px rgba(0,0,0,0.2)", position: "relative" }} onClick={e => e.stopPropagation()}>
+        <canvas ref={canvasRef} style={{ width: "100%", height: 160, display: "block" }} />
+        <div style={{ padding: "24px 32px 32px" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginBottom: 8 }}>{title}</div>
+          <div style={{ fontSize: 14, color: "#6B6B6B", lineHeight: 1.5, marginBottom: 24 }}>{message}</div>
+          <button onClick={onClose} style={{
+            padding: "10px 32px", borderRadius: 8, border: "none", background: "#1A1A1A", color: "#FFF",
+            fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+          }}>Let's go!</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── File Upload Area ─── */
 export function FileUploadArea({
   onFilesSelected, accept, label = "Drop files here or click to upload",

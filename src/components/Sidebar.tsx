@@ -61,7 +61,7 @@ function getInitials(name: string): string {
 
 export function Sidebar({
   currentPage, onNavigate, userName, userRole, approvalCount, onSignOut,
-  videos = [], leads = [], clients = [], ads = [],
+  videos = [], leads = [], clients = [], ads = [], permissions,
 }: {
   currentPage: string;
   onNavigate: (page: string) => void;
@@ -73,12 +73,16 @@ export function Sidebar({
   leads?: Lead[];
   clients?: Client[];
   ads?: AdCampaign[];
+  permissions?: Record<string, boolean>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
-  const navItems = isSuperAdmin(userName)
-    ? [...NAV, { id: "users", label: "Users", group: "admin" }]
+  const filteredNav = permissions
+    ? NAV.filter(item => permissions[item.id] !== false)
     : NAV;
+  const navItems = isSuperAdmin(userName)
+    ? [...filteredNav, { id: "users", label: "Users", group: "admin" }]
+    : filteredNav;
 
   return (
     <div style={{

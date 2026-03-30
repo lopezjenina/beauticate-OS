@@ -26,8 +26,20 @@ const notificationPageMap: Record<string, string> = {
 
 export function NotificationBell({ videos, leads, onNavigate }: NotificationBellProps) {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("agencyos_dismissed_notifs");
+      if (saved) {
+        try { return new Set(JSON.parse(saved)); } catch { /* fallback */ }
+      }
+    }
+    return new Set();
+  });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    sessionStorage.setItem("agencyos_dismissed_notifs", JSON.stringify([...dismissedIds]));
+  }, [dismissedIds]);
 
   useEffect(() => {
     if (!showDropdown) return;

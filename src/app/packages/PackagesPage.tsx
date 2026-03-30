@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Btn, PageHeader, Badge, ConfirmModal } from '@/components/ui';
 
 export type ServicePackage = {
@@ -21,7 +21,20 @@ const INIT_PACKAGES: ServicePackage[] = [
 ];
 
 export default function PackagesPage() {
-  const [packages, setPackages] = useState<ServicePackage[]>(INIT_PACKAGES);
+  const [packages, setPackages] = useState<ServicePackage[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("agencyos_packages");
+      if (saved) {
+        try { return JSON.parse(saved); } catch { /* fallback */ }
+      }
+    }
+    return INIT_PACKAGES;
+  });
+
+  // Persist on change
+  useEffect(() => {
+    sessionStorage.setItem("agencyos_packages", JSON.stringify(packages));
+  }, [packages]);
   const [showModal, setShowModal] = useState(false);
   const [editingPkg, setEditingPkg] = useState<ServicePackage | null>(null);
   const [deletingPkg, setDeletingPkg] = useState<ServicePackage | null>(null);

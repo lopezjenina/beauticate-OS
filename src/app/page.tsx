@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { LoginPage } from "@/components/LoginPage";
 import DashboardPage from "./dashboard/DashboardPage";
@@ -18,8 +18,9 @@ import ActivityPage from "./activity/ActivityPage";
 import ClientsPage from "./clients/ClientsPage";
 import PackagesPage from "./packages/PackagesPage";
 import {
-  INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, TEAM, EDITORS,
+  INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, EDITORS,
 } from "@/lib/store";
+import { logActivity } from "@/lib/activityLog";
 import { INIT_USERS, isAdmin, isSuperAdmin } from "@/lib/auth";
 import type { AppUser } from "@/lib/auth";
 import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/types";

@@ -482,7 +482,7 @@ export default function ProductionPage({
                             }}
                           >
                             {/* Client Name */}
-                            <td style={{ padding: '16px 24px', color: '#1A1A1A', fontWeight: '500' }}>
+                            <td style={{ padding: '16px 24px', color: '#1A1A1A', fontWeight: '500', whiteSpace: 'nowrap' }}>
                               {client.name}
                             </td>
 

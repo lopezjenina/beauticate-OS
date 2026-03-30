@@ -36,7 +36,6 @@ export default function SalesPage({
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [deletingLead, setDeletingLead] = useState<Lead | null>(null);
   const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
-  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     contactName: "",
     company: "",
@@ -112,7 +111,6 @@ export default function SalesPage({
     setFormData({ contactName: "", company: "", email: "", phone: "", source: "", estimatedRevenue: "", notes: "" });
     setFormAttachments([]);
     setEditingLead(null);
-    setInlineEditId(null);
     setShowNewLeadForm(false);
   };
 
@@ -128,39 +126,10 @@ export default function SalesPage({
     });
     setFormAttachments(lead.attachments || []);
     setEditingLead(lead);
-    setInlineEditId(lead.id);
+    setShowNewLeadForm(true);
   };
 
-  const handleInlineSave = () => {
-    if (!editingLead || !formData.contactName || !formData.company || !formData.email || !formData.source) {
-      return;
-    }
-    const updated = leads.map((l) =>
-      l.id === editingLead.id
-        ? {
-            ...l,
-            contactName: formData.contactName,
-            company: formData.company,
-            email: formData.email,
-            phone: formData.phone,
-            source: formData.source,
-            estimatedRevenue: parseInt(formData.estimatedRevenue) || 0,
-            notes: formData.notes,
-            attachments: formAttachments.length > 0 ? formAttachments : undefined,
-          }
-        : l
-    );
-    setInternalLeads(updated);
-    setLeads(() => updated);
-    resetForm();
-  };
 
-  const handleInlineCancel = () => {
-    setFormData({ contactName: "", company: "", email: "", phone: "", source: "", estimatedRevenue: "", notes: "" });
-    setFormAttachments([]);
-    setEditingLead(null);
-    setInlineEditId(null);
-  };
 
   const handleDeleteLead = () => {
     if (!deletingLead) return;
@@ -298,104 +267,7 @@ export default function SalesPage({
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "14px", flex: 1 }}>
-              {leadsByStage[stage].map((lead) =>
-                inlineEditId === lead.id ? (
-                  /* ---- Inline Edit Card ---- */
-                  <div
-                    key={lead.id}
-                    style={{
-                      padding: "20px 16px",
-                      background: "#FFFFFF",
-                      borderRadius: "6px",
-                      border: "1px solid #D0D0D0",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Company</div>
-                        <input
-                          type="text"
-                          placeholder="Company"
-                          value={formData.company}
-                          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Contact Name</div>
-                        <input
-                          type="text"
-                          placeholder="Contact Name"
-                          value={formData.contactName}
-                          onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Email</div>
-                        <input
-                          type="email"
-                          placeholder="Email"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Phone</div>
-                        <input
-                          type="tel"
-                          placeholder="Phone"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Source</div>
-                        <select
-                          value={formData.source}
-                          onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        >
-                          <option value="">Select source</option>
-                          <option value="Instagram DM">Instagram DM</option>
-                          <option value="Referral">Referral</option>
-                          <option value="Website">Website</option>
-                          <option value="Cold outreach">Cold outreach</option>
-                          <option value="LinkedIn">LinkedIn</option>
-                          <option value="Event">Event</option>
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Revenue</div>
-                        <input
-                          type="number"
-                          placeholder="Revenue"
-                          value={formData.estimatedRevenue}
-                          onChange={(e) => setFormData({ ...formData, estimatedRevenue: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>Notes</div>
-                        <textarea
-                          placeholder="Notes"
-                          rows={3}
-                          value={formData.notes}
-                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                          style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #E3E3E0", borderRadius: 4, width: "100%", fontFamily: "inherit", boxSizing: "border-box" as const, resize: "vertical" }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                      <Btn variant="primary" onClick={handleInlineSave} style={{ fontSize: 11, padding: "6px 14px" }}>Save</Btn>
-                      <Btn variant="ghost" onClick={handleInlineCancel} style={{ fontSize: 11, padding: "6px 14px" }}>Cancel</Btn>
-                    </div>
-                  </div>
-                ) : (
-                  /* ---- Read-only Card ---- */
+              {leadsByStage[stage].map((lead) => (
                   <div
                     key={lead.id}
                     draggable
@@ -523,10 +395,10 @@ export default function SalesPage({
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0, 0, 0, 0.4)",
+            background: "rgba(0, 0, 0, 0.3)",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: "stretch",
+            justifyContent: "flex-end",
             zIndex: 1000,
           }}
           onClick={resetForm}
@@ -534,13 +406,13 @@ export default function SalesPage({
           <div
             style={{
               background: "#FFFFFF",
-              borderRadius: "8px",
-              border: "1px solid #E3E3E0",
-              padding: "40px",
-              maxWidth: "500px",
-              width: "90%",
-              maxHeight: "90vh",
-              overflow: "auto",
+              width: "420px",
+              maxWidth: "90vw",
+              height: "100vh",
+              overflowY: "auto",
+              padding: "32px",
+              boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+              borderLeft: "1px solid #E3E3E0",
             }}
             onClick={(e) => e.stopPropagation()}
           >

@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { id: "publishing", label: "Publishing", group: "operations" },
   { id: "editors", label: "Editors", group: "team" },
   { id: "ads", label: "Ads", group: "team" },
+  { id: "packages", label: "Packages", group: "resources" },
   { id: "knowledge", label: "Knowledge Base", group: "resources" },
   { id: "activity", label: "Activity Log", group: "resources" },
 ];

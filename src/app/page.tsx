@@ -16,6 +16,7 @@ import UsersPage from "./users/UsersPage";
 import CalendarPage from "./calendar/CalendarPage";
 import ActivityPage from "./activity/ActivityPage";
 import ClientsPage from "./clients/ClientsPage";
+import PackagesPage from "./packages/PackagesPage";
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, TEAM, EDITORS,
 } from "@/lib/store";
@@ -25,7 +26,21 @@ import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/ty
 
 export default function App() {
   const [users, setUsers] = useState<AppUser[]>(INIT_USERS);
-  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("agencyos_user");
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+  React.useEffect(() => {
+    if (user) {
+      sessionStorage.setItem("agencyos_user", JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem("agencyos_user");
+    }
+  }, [user]);
+
   const [page, setPage] = useState("dashboard");
 
   /* ─── Shared State ─── */
@@ -123,6 +138,8 @@ export default function App() {
         return <EditorsPage videos={videos} />;
       case "ads":
         return <AdsPage ads={ads} setAds={setAds} clients={clients} canDelete={canDelete} />;
+      case "packages":
+        return <PackagesPage />;
       case "knowledge":
         return <KnowledgePage canDelete={canDelete} />;
       case "activity":

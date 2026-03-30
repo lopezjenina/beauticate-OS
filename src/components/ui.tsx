@@ -149,3 +149,187 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle?: stri
     </div>
   );
 }
+
+/* ─── Confirm Modal ─── */
+export function ConfirmModal({
+  title, message, confirmLabel = "Delete", onConfirm, onCancel, variant = "danger",
+}: {
+  title: string; message: string; confirmLabel?: string;
+  onConfirm: () => void; onCancel: () => void; variant?: "danger" | "primary";
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center",
+        justifyContent: "center", zIndex: 1100,
+      }}
+      onClick={onCancel}
+    >
+      <div
+        style={{
+          background: "#FFF", borderRadius: 8, border: "1px solid var(--border)",
+          padding: "32px", maxWidth: 400, width: "90%", textAlign: "center",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{title}</div>
+        <div style={{ fontSize: 14, color: "var(--text-sec)", marginBottom: 24, lineHeight: 1.5 }}>{message}</div>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <Btn onClick={onCancel}>Cancel</Btn>
+          <Btn
+            variant="primary"
+            onClick={onConfirm}
+            style={variant === "danger" ? { background: "var(--red)", color: "#FFF" } : undefined}
+          >
+            {confirmLabel}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── File Upload Area ─── */
+export function FileUploadArea({
+  onFilesSelected, accept, label = "Drop files here or click to upload",
+}: {
+  onFilesSelected: (files: { name: string; url: string; type: "image" | "video" | "document" }[]) => void;
+  accept?: string;
+  label?: string;
+}) {
+  const [dragOver, setDragOver] = React.useState(false);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const processFiles = (fileList: FileList) => {
+    const results: { name: string; url: string; type: "image" | "video" | "document" }[] = [];
+    Array.from(fileList).forEach((file) => {
+      const url = URL.createObjectURL(file);
+      let type: "image" | "video" | "document" = "document";
+      if (file.type.startsWith("image/")) type = "image";
+      else if (file.type.startsWith("video/")) type = "video";
+      results.push({ name: file.name, url, type });
+    });
+    onFilesSelected(results);
+  };
+
+  return (
+    <div
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) processFiles(e.dataTransfer.files); }}
+      style={{
+        border: `2px dashed ${dragOver ? "var(--accent)" : "var(--border)"}`,
+        borderRadius: 8, padding: "24px 16px", textAlign: "center", cursor: "pointer",
+        background: dragOver ? "var(--accent-light)" : "var(--bg-sub)",
+        transition: "all 0.15s",
+      }}
+    >
+      <div style={{ fontSize: 13, color: "var(--text-sec)", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 11, color: "var(--text-ter)" }}>Images, videos, or documents</div>
+      <input ref={inputRef} type="file" multiple accept={accept} style={{ display: "none" }} onChange={(e) => { if (e.target.files?.length) processFiles(e.target.files); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+/* ─── Attachment List ─── */
+export function AttachmentList({
+  attachments, onRemove, compact = false,
+}: {
+  attachments: { id: string; name: string; url: string; type: string; thumbnailUrl?: string }[];
+  onRemove?: (id: string) => void;
+  compact?: boolean;
+}) {
+  if (attachments.length === 0) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: compact ? 6 : 8, marginTop: compact ? 6 : 8 }}>
+      {attachments.map((att) => (
+        <div
+          key={att.id}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: compact ? "2px 8px" : "4px 10px",
+            background: "var(--bg-sub)", border: "1px solid var(--border-light)",
+            borderRadius: 6, fontSize: compact ? 11 : 12, color: "var(--text-sec)",
+            maxWidth: 200,
+          }}
+        >
+          {att.type === "image" && (
+            <img src={att.thumbnailUrl || att.url} alt="" style={{ width: compact ? 16 : 20, height: compact ? 16 : 20, borderRadius: 3, objectFit: "cover" }} />
+          )}
+          {att.type === "link" && <span style={{ fontSize: compact ? 10 : 12 }}>&#128279;</span>}
+          {att.type === "video" && <span style={{ fontSize: compact ? 10 : 12 }}>&#127916;</span>}
+          {att.type === "document" && <span style={{ fontSize: compact ? 10 : 12 }}>&#128196;</span>}
+          <a
+            href={att.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              color: "var(--accent)", textDecoration: "none", overflow: "hidden",
+              textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}
+          >
+            {att.name}
+          </a>
+          {onRemove && (
+            <span
+              onClick={(e) => { e.stopPropagation(); onRemove(att.id); }}
+              style={{ cursor: "pointer", color: "var(--text-ter)", fontSize: 14, lineHeight: 1, marginLeft: 2 }}
+            >
+              ×
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Link Input ─── */
+export function LinkInput({
+  onAdd,
+}: {
+  onAdd: (link: { name: string; url: string }) => void;
+}) {
+  const [url, setUrl] = React.useState("");
+  const [label, setLabel] = React.useState("");
+
+  const handleAdd = () => {
+    if (!url.trim()) return;
+    onAdd({ name: label.trim() || url.trim(), url: url.trim().startsWith("http") ? url.trim() : `https://${url.trim()}` });
+    setUrl("");
+    setLabel("");
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, color: "var(--text-ter)", marginBottom: 4 }}>URL</div>
+        <input
+          type="text" value={url} onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://..."
+          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          style={{
+            width: "100%", padding: "6px 10px", borderRadius: 6,
+            border: "1px solid var(--border)", fontSize: 13, fontFamily: "inherit",
+          }}
+        />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 11, color: "var(--text-ter)", marginBottom: 4 }}>Label (optional)</div>
+        <input
+          type="text" value={label} onChange={(e) => setLabel(e.target.value)}
+          placeholder="Link name"
+          onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          style={{
+            width: "100%", padding: "6px 10px", borderRadius: 6,
+            border: "1px solid var(--border)", fontSize: 13, fontFamily: "inherit",
+          }}
+        />
+      </div>
+      <Btn onClick={handleAdd} style={{ flexShrink: 0, padding: "6px 12px" }}>Add</Btn>
+    </div>
+  );
+}

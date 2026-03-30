@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { isSuperAdmin } from "@/lib/auth";
 
 type NavItem = { id: string; label: string; group?: string };
 
@@ -25,6 +26,10 @@ export function Sidebar({
   approvalCount?: number;
   onSignOut: () => void;
 }) {
+  const navItems = isSuperAdmin(userName)
+    ? [...NAV, { id: "users", label: "Users", group: "admin" }]
+    : NAV;
+
   return (
     <div style={{
       width: 220, background: "var(--bg-sub)", borderRight: "1px solid var(--border)",
@@ -37,7 +42,7 @@ export function Sidebar({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-        {NAV.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onNavigate(item.id)}

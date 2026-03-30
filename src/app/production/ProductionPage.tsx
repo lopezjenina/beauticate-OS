@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Avatar, Badge, Checkbox, PageHeader, Stat } from '@/components/ui';
+import { Avatar, Badge, Btn, Checkbox, PageHeader, Stat } from '@/components/ui';
 import { Client, Video } from '@/lib/types';
-import { TEAM } from '@/lib/store';
+import { TEAM, EDITORS } from '@/lib/store';
 
 interface ProductionPageProps {
   clients: Client[];
@@ -18,12 +18,43 @@ interface WeekGroup {
   clients: (Client & { videoData: Video[] })[];
 }
 
+const STATUS_OPTIONS = [
+  { value: "not_started", label: "Not Started" },
+  { value: "editing", label: "Editing" },
+  { value: "delivered", label: "Delivered" },
+  { value: "revision", label: "Revision" },
+  { value: "approved", label: "Approved" },
+];
+
+const inlineSelectStyle: React.CSSProperties = {
+  padding: "4px 8px",
+  fontSize: 12,
+  border: "1px solid #E3E3E0",
+  borderRadius: 4,
+  fontFamily: "inherit",
+  background: "#FFF",
+};
+
+const inlineNumberStyle: React.CSSProperties = {
+  width: 50,
+  padding: "4px 6px",
+  fontSize: 12,
+  border: "1px solid #E3E3E0",
+  borderRadius: 4,
+  textAlign: "center" as const,
+  fontFamily: "inherit",
+  background: "#FFF",
+};
+
 export default function ProductionPage({
   clients,
   videos,
   setVideos,
 }: ProductionPageProps) {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
+  const [showAddVideoModal, setShowAddVideoModal] = useState(false);
+  const [selectedClientForVideo, setSelectedClientForVideo] = useState<Client | null>(null);
+  const [videoFormData, setVideoFormData] = useState({ title: "", platform: "Instagram", shootDate: "", dueDate: "" });
 
   // Group clients by week
   const weekGroups = useMemo<WeekGroup[]>(() => {
@@ -125,12 +156,44 @@ export default function ProductionPage({
     );
   };
 
+  const handleCreateVideo = () => {
+    if (!selectedClientForVideo || !videoFormData.title) return;
+    const client = selectedClientForVideo;
+    const newVideo: Video = {
+      id: `v-${Date.now()}`,
+      clientId: client.id,
+      editorId: client.assignedEditor || EDITORS[0]?.id || "e1",
+      week: client.week,
+      title: videoFormData.title,
+      shootDate: videoFormData.shootDate || new Date().toISOString().split("T")[0],
+      dueDate: videoFormData.dueDate || new Date().toISOString().split("T")[0],
+      footageUploaded: false,
+      editingStatus: "not_started",
+      revisionsUsed: 0,
+      captionWritten: false,
+      thumbnailDone: false,
+      platform: videoFormData.platform,
+      postingStatus: "pending",
+      sentToGuido: false,
+      posted: false,
+      notes: [],
+    };
+    setVideos((prev) => [...prev, newVideo]);
+    setShowAddVideoModal(false);
+    setSelectedClientForVideo(null);
+    setVideoFormData({ title: "", platform: "Instagram", shootDate: "", dueDate: "" });
+  };
+
   return (
     <div style={{ padding: '40px' }}>
       <PageHeader
         title="Production Control Center"
         subtitle="Manage all client videos and production workflow"
-      />
+      >
+        <Btn variant="primary" onClick={() => { setSelectedClientForVideo(clients[0] || null); setShowAddVideoModal(true); }}>
+          Add Video
+        </Btn>
+      </PageHeader>
 
       {/* Summary Stats */}
       <div
@@ -412,46 +475,70 @@ export default function ProductionPage({
 
                             {/* Assigned Editor */}
                             <td style={{ padding: '16px 24px' }}>
-                              {client.assignedEditor ? (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                  }}
+                              {firstVideo ? (
+                                <select
+                                  value={firstVideo.editorId || ''}
+                                  onChange={(e) =>
+                                    handleVideoPropertyChange(firstVideo.id, 'editorId', e.target.value)
+                                  }
+                                  style={inlineSelectStyle}
                                 >
-                                  <Avatar
-                                    initials={getAssignedEditor(client.assignedEditor)?.initials || '??'}
-                                    size={24}
-                                  />
-                                  <span style={{ color: '#1A1A1A', fontSize: '13px' }}>
-                                    {getAssignedEditor(client.assignedEditor)?.name}
-                                  </span>
-                                </div>
+                                  <option value="">Unassigned</option>
+                                  {EDITORS.map((editor) => (
+                                    <option key={editor.id} value={editor.id}>
+                                      {editor.name}
+                                    </option>
+                                  ))}
+                                </select>
                               ) : (
                                 <span style={{ color: '#9B9B9B', fontSize: '13px' }}>Unassigned</span>
                               )}
                             </td>
 
                             {/* Shoot Date */}
-                            <td style={{ padding: '16px 24px', color: '#1A1A1A' }}>
-                              {firstVideo?.shootDate || ''}
+                            <td style={{ padding: '16px 24px' }}>
+                              <input
+                                type="date"
+                                value={firstVideo?.shootDate || ''}
+                                onChange={(e) =>
+                                  firstVideo &&
+                                  handleVideoPropertyChange(firstVideo.id, 'shootDate', e.target.value)
+                                }
+                                style={inlineSelectStyle}
+                              />
                             </td>
 
                             {/* Footage Uploaded */}
                             <td style={{ padding: '16px 24px' }}>
-                              {firstVideo?.footageUploaded ? (
-                                <Badge variant="success">Yes</Badge>
-                              ) : (
-                                <Badge>No</Badge>
-                              )}
+                              <Checkbox
+                                checked={firstVideo?.footageUploaded || false}
+                                onChange={() =>
+                                  firstVideo &&
+                                  handleVideoPropertyChange(
+                                    firstVideo.id,
+                                    'footageUploaded',
+                                    !firstVideo.footageUploaded
+                                  )
+                                }
+                              />
                             </td>
 
                             {/* Editing Status */}
                             <td style={{ padding: '16px 24px' }}>
-                              <Badge variant={getStatusBadgeVariant(editingStatus)}>
-                                {editingStatus}
-                              </Badge>
+                              <select
+                                value={firstVideo?.editingStatus || 'not_started'}
+                                onChange={(e) =>
+                                  firstVideo &&
+                                  handleVideoPropertyChange(firstVideo.id, 'editingStatus', e.target.value)
+                                }
+                                style={inlineSelectStyle}
+                              >
+                                {STATUS_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
                             </td>
 
                             {/* Approved */}
@@ -494,8 +581,21 @@ export default function ProductionPage({
                             </td>
 
                             {/* Revisions Used */}
-                            <td style={{ padding: '16px 24px', textAlign: 'center', color: '#1A1A1A' }}>
-                              {firstVideo?.revisionsUsed || 0}
+                            <td style={{ padding: '16px 24px', textAlign: 'center' }}>
+                              <input
+                                type="number"
+                                min={0}
+                                value={firstVideo?.revisionsUsed || 0}
+                                onChange={(e) =>
+                                  firstVideo &&
+                                  handleVideoPropertyChange(
+                                    firstVideo.id,
+                                    'revisionsUsed',
+                                    parseInt(e.target.value) || 0
+                                  )
+                                }
+                                style={inlineNumberStyle}
+                              />
                             </td>
                           </tr>
                         );
@@ -508,6 +608,93 @@ export default function ProductionPage({
           );
         })}
       </div>
+
+      {/* Add Video Modal */}
+      {showAddVideoModal && (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 1000,
+          }}
+          onClick={() => setShowAddVideoModal(false)}
+        >
+          <div
+            style={{
+              background: "#FFFFFF", borderRadius: 8, border: "1px solid #E3E3E0",
+              padding: 40, maxWidth: 500, width: "90%",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 28px", letterSpacing: "-0.01em" }}>
+              Add Video
+            </h2>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 28 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Client</label>
+                <select
+                  value={selectedClientForVideo?.id || ""}
+                  onChange={(e) => setSelectedClientForVideo(clients.find((c) => c.id === e.target.value) || null)}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E3E3E0", fontSize: 13, fontFamily: "inherit" }}
+                >
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Title</label>
+                <input
+                  type="text" value={videoFormData.title}
+                  onChange={(e) => setVideoFormData({ ...videoFormData, title: e.target.value })}
+                  placeholder="e.g., Brand intro reel"
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E3E3E0", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Platform</label>
+                <select
+                  value={videoFormData.platform}
+                  onChange={(e) => setVideoFormData({ ...videoFormData, platform: e.target.value })}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E3E3E0", fontSize: 13, fontFamily: "inherit" }}
+                >
+                  <option value="Instagram">Instagram</option>
+                  <option value="TikTok">TikTok</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="YouTube">YouTube</option>
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Shoot Date</label>
+                  <input
+                    type="date" value={videoFormData.shootDate}
+                    onChange={(e) => setVideoFormData({ ...videoFormData, shootDate: e.target.value })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E3E3E0", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Due Date</label>
+                  <input
+                    type="date" value={videoFormData.dueDate}
+                    onChange={(e) => setVideoFormData({ ...videoFormData, dueDate: e.target.value })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #E3E3E0", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <Btn onClick={() => setShowAddVideoModal(false)}>Cancel</Btn>
+              <Btn variant="primary" onClick={handleCreateVideo}>Create Video</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

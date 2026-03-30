@@ -1,3 +1,14 @@
+/* ─── Shared ─── */
+
+export type Attachment = {
+  id: string;
+  name: string;
+  url: string;
+  type: "image" | "video" | "document" | "link";
+  thumbnailUrl?: string;
+  addedAt: string;
+};
+
 /* ─── Core Types ─── */
 
 export type Client = {
@@ -39,6 +50,7 @@ export type Video = {
   sentToGuido: boolean;
   posted: boolean;
   notes: Note[];
+  attachments?: Attachment[];
 };
 
 export type Note = {
@@ -60,6 +72,7 @@ export type Lead = {
   closeDate?: string;
   notes: string;
   createdAt: string;
+  attachments?: Attachment[];
 };
 
 export type OnboardingClient = {
@@ -78,6 +91,9 @@ export type OnboardingClient = {
   };
   assignedEditor?: string;
   assignedSocialManager?: string;
+  notes?: string;
+  contactEmail?: string;
+  phone?: string;
 };
 
 export type AdCampaign = {
@@ -91,6 +107,7 @@ export type AdCampaign = {
   creative: string;
   optimizationSchedule: string;
   notes: string;
+  attachments?: Attachment[];
 };
 
 export type KBDoc = {
@@ -100,4 +117,6 @@ export type KBDoc = {
   author: string;
   updated: string;
   body: string;
+  attachments?: Attachment[];
 };
+

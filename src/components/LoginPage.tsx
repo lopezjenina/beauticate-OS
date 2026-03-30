@@ -1,15 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
+import { AppUser } from "@/lib/auth";
 
-export function LoginPage({ onLogin }: { onLogin: (user: { name: string; email: string; role: string }) => void }) {
-  const [email, setEmail] = useState("admin@agency.com");
-  const [pass, setPass] = useState("password");
+export function LoginPage({
+  onLogin,
+  users,
+}: {
+  onLogin: (user: { name: string; email: string; role: string }) => void;
+  users: AppUser[];
+}) {
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    if (email && pass) {
-      onLogin({ name: "Jenina Lopez", email, role: "Admin" });
+    const found = users.find((u) => u.email === email && u.password === pass);
+    if (found) {
+      onLogin({ name: found.username, email: found.email, role: found.role });
+    } else if (email && pass) {
+      setError("Invalid email or password.");
     } else {
       setError("Please enter your credentials.");
     }
@@ -65,7 +75,7 @@ export function LoginPage({ onLogin }: { onLogin: (user: { name: string; email: 
           </button>
         </div>
         <div style={{ marginTop: 24, fontSize: 12, color: "var(--text-ter)", textAlign: "center" }}>
-          Demo credentials are pre-filled.
+          Agency OS
         </div>
       </div>
     </div>

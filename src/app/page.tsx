@@ -12,12 +12,16 @@ import PublishingPage from "./publishing/PublishingPage";
 import EditorsPage from "./editors/EditorsPage";
 import AdsPage from "./ads/AdsPage";
 import KnowledgePage from "./knowledge/KnowledgePage";
+import UsersPage from "./users/UsersPage";
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, TEAM, EDITORS,
 } from "@/lib/store";
+import { INIT_USERS, isAdmin, isSuperAdmin } from "@/lib/auth";
+import type { AppUser } from "@/lib/auth";
 import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/types";
 
 export default function App() {
+  const [users, setUsers] = useState<AppUser[]>(INIT_USERS);
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const [page, setPage] = useState("dashboard");
 
@@ -28,9 +32,12 @@ export default function App() {
   const [onboardingClients, setOnboardingClients] = useState<OnboardingClient[]>(INIT_ONBOARDING);
   const [ads, setAds] = useState<AdCampaign[]>(INIT_ADS);
 
+  /* ─── Admin check ─── */
+  const canDelete = user ? isAdmin(user.name) : false;
+  const isSuperAdminUser = user ? isSuperAdmin(user.name) : false;
+
   /* ─── Gate: Sales → Onboarding ─── */
   const handleClosedWon = useCallback((lead: Lead) => {
-    // Auto-create onboarding client from closed deal
     const newOb: OnboardingClient = {
       id: `ob-${Date.now()}`,
       name: lead.company,
@@ -51,7 +58,6 @@ export default function App() {
 
   /* ─── Gate: Onboarding → Production ─── */
   const handleMoveToProduction = useCallback((ob: OnboardingClient) => {
-    // Find next available week
     const weekCounts = [0, 0, 0, 0];
     clients.forEach((c) => { if (c.status === "active") weekCounts[c.week - 1]++; });
     const minWeek = (weekCounts.indexOf(Math.min(...weekCounts)) + 1) as 1 | 2 | 3 | 4;
@@ -73,20 +79,21 @@ export default function App() {
   /* ─── Derived counts ─── */
   const approvalCount = videos.filter((v) => v.editingStatus === "delivered").length;
 
-  if (!user) return <LoginPage onLogin={setUser} />;
+  if (!user) return <LoginPage onLogin={setUser} users={users} />;
 
   const renderPage = () => {
     switch (page) {
       case "dashboard":
         return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
       case "sales":
-        return <SalesPage leads={leads} setLeads={setLeads} onClosedWon={handleClosedWon} />;
+        return <SalesPage leads={leads} setLeads={setLeads} onClosedWon={handleClosedWon} canDelete={canDelete} />;
       case "onboarding":
         return (
           <OnboardingPage
             onboardingClients={onboardingClients}
             setOnboardingClients={setOnboardingClients}
             onMoveToProduction={handleMoveToProduction}
+            canDelete={canDelete}
           />
         );
       case "production":
@@ -98,9 +105,11 @@ export default function App() {
       case "editors":
         return <EditorsPage videos={videos} />;
       case "ads":
-        return <AdsPage ads={ads} setAds={setAds} clients={clients} />;
+        return <AdsPage ads={ads} setAds={setAds} clients={clients} canDelete={canDelete} />;
       case "knowledge":
-        return <KnowledgePage />;
+        return <KnowledgePage canDelete={canDelete} />;
+      case "users":
+        return isSuperAdminUser ? <UsersPage users={users} setUsers={setUsers} /> : <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
       default:
         return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
     }

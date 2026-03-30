@@ -288,6 +288,22 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 24px' }}>
+                      {/* Contact Person */}
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--text-ter)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Person</div>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={client.contactPerson || ''}
+                            onChange={(e) => handleFieldChange(client.id, 'contactPerson', e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ ...inlineInput, width: '100%' }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 13, color: '#1A1A1A', fontWeight: 500 }}>{client.contactPerson || '-'}</div>
+                        )}
+                      </div>
+
                       {/* Email */}
                       <div>
                         <div style={{ fontSize: 10, color: 'var(--text-ter)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</div>

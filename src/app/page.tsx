@@ -60,6 +60,9 @@ export default function App() {
       id: `ob-${Date.now()}`,
       name: lead.company,
       leadId: lead.id,
+      contactPerson: lead.contactName,
+      contactEmail: lead.email,
+      phone: lead.phone,
       package: "Growth",
       startDate: new Date().toISOString().split("T")[0],
       steps: {
@@ -94,6 +97,7 @@ export default function App() {
       assignedSocialManager: ob.assignedSocialManager || "sm1",
       week: assignedWeek,
       status: "active",
+      contactPerson: ob.contactPerson,
       contactEmail: ob.contactEmail,
       phone: ob.phone,
       package: ob.package,

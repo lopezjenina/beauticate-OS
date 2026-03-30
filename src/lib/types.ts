@@ -26,6 +26,7 @@ export type Client = {
   package?: string;
   notes?: string;
   graduatedFrom?: string; // onboarding client id
+  contactPerson?: string;
 };
 
 export type TeamMember = {
@@ -99,6 +100,7 @@ export type OnboardingClient = {
   notes?: string;
   contactEmail?: string;
   phone?: string;
+  contactPerson?: string;
 };
 
 export type AdCampaign = {

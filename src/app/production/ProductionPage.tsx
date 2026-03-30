@@ -57,6 +57,9 @@ export default function ProductionPage({
 }: ProductionPageProps) {
   const editorList = editorsProp || EDITORS.map(e => ({ id: e.id, name: e.name }));
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [noteModalVideoId, setNoteModalVideoId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
   const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
   const [selectedClientForVideo, setSelectedClientForVideo] = useState<Client | null>(null);
@@ -475,18 +478,25 @@ export default function ProductionPage({
                       {group.clients.map((client, idx) => {
                         const firstVideo = client.videoData[0];
                         const editingStatus = getEditingStatus(client.videoData);
+                        const isRowExpanded = expandedRowId === client.id;
 
                         return (
+                          <React.Fragment key={client.id}>
                           <tr
-                            key={client.id}
                             style={{
                               borderBottom: '1px solid #E3E3E0',
-                              backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F7F7F5',
+                              backgroundColor: isRowExpanded ? '#F0F0EE' : idx % 2 === 0 ? '#FFFFFF' : '#F7F7F5',
                             }}
                           >
                             {/* Client Name */}
-                            <td style={{ padding: '16px 24px', color: '#1A1A1A', fontWeight: '500', whiteSpace: 'nowrap' }}>
-                              {client.name}
+                            <td
+                              onClick={() => setExpandedRowId(isRowExpanded ? null : client.id)}
+                              style={{ padding: '16px 24px', color: '#1A1A1A', fontWeight: '500', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                            >
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 10, color: "#9B9B9B", transition: "transform 0.2s", transform: isRowExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
+                                {client.name}
+                              </span>
                             </td>
 
                             {/* Monthly Revenue */}
@@ -641,6 +651,113 @@ export default function ProductionPage({
                               </td>
                             )}
                           </tr>
+                          {/* Expanded Row */}
+                          {isRowExpanded && (
+                            <tr>
+                              <td colSpan={canDelete ? 11 : 10} style={{ padding: 0 }}>
+                                <div style={{ background: "#F7F7F5", padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
+                                  {/* Mini video table */}
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>
+                                    Videos ({client.videoData.length})
+                                  </div>
+                                  {client.videoData.length === 0 ? (
+                                    <div style={{ fontSize: 12, color: "#9B9B9B", padding: "8px 0" }}>No videos for this client.</div>
+                                  ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#FFFFFF", borderRadius: 6, overflow: "hidden", border: "1px solid #E3E3E0" }}>
+                                      <thead>
+                                        <tr style={{ borderBottom: "1px solid #E3E3E0", background: "#FAFAF9" }}>
+                                          {["Title", "Platform", "Status", "Due Date", "Notes", "Status Timeline"].map(h => (
+                                            <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9B9B9B", textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {client.videoData.map((vid) => {
+                                          const statusSteps = ["not_started", "editing", "delivered", "revision", "approved"];
+                                          const statusLabels: Record<string, string> = { not_started: "Not Started", editing: "Editing", delivered: "Delivered", revision: "Revision", approved: "Approved" };
+                                          const currentIdx = statusSteps.indexOf(vid.editingStatus || "not_started");
+                                          return (
+                                            <tr key={vid.id} style={{ borderBottom: "1px solid #F0F0EE" }}>
+                                              <td style={{ padding: "10px 12px", fontWeight: 500, color: "#1A1A1A" }}>{vid.title || "Untitled"}</td>
+                                              <td style={{ padding: "10px 12px", color: "#6B6B6B" }}>{vid.platform || "—"}</td>
+                                              <td style={{ padding: "10px 12px" }}>
+                                                <Badge variant={getStatusBadgeVariant((statusLabels[vid.editingStatus || "not_started"] || "Not Started") as EditingStatus)}>
+                                                  {statusLabels[vid.editingStatus || "not_started"] || "Not Started"}
+                                                </Badge>
+                                              </td>
+                                              <td style={{ padding: "10px 12px", color: "#6B6B6B" }}>{vid.dueDate || "—"}</td>
+                                              <td style={{ padding: "10px 12px" }}>
+                                                {(vid.notes || []).length > 0 ? (
+                                                  <span
+                                                    onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(vid.id); }}
+                                                    style={{ fontSize: 11, fontWeight: 600, color: "#4DAB9A", cursor: "pointer", padding: "2px 8px", borderRadius: 10, background: "#EAF5F2" }}
+                                                  >
+                                                    {vid.notes.length} note{vid.notes.length !== 1 ? "s" : ""}
+                                                  </span>
+                                                ) : (
+                                                  <span
+                                                    onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(vid.id); }}
+                                                    style={{ fontSize: 11, color: "#9B9B9B", cursor: "pointer", fontWeight: 500 }}
+                                                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#4DAB9A"; }}
+                                                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#9B9B9B"; }}
+                                                  >
+                                                    + Add note
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td style={{ padding: "10px 12px" }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                                  {statusSteps.map((step, si) => {
+                                                    const isCompleted = si <= currentIdx;
+                                                    const isCurrent = si === currentIdx;
+                                                    return (
+                                                      <React.Fragment key={step}>
+                                                        <div style={{
+                                                          width: isCurrent ? 10 : 8, height: isCurrent ? 10 : 8,
+                                                          borderRadius: "50%",
+                                                          background: isCompleted ? "#4DAB9A" : "#E3E3E0",
+                                                          border: isCurrent ? "2px solid #4DAB9A" : "none",
+                                                          boxSizing: "border-box",
+                                                        }} title={statusLabels[step]} />
+                                                        {si < statusSteps.length - 1 && (
+                                                          <div style={{ width: 12, height: 2, background: si < currentIdx ? "#4DAB9A" : "#E3E3E0" }} />
+                                                        )}
+                                                      </React.Fragment>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  )}
+
+                                  {/* History / Notes */}
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginTop: 16, marginBottom: 8 }}>History</div>
+                                  {(() => {
+                                    const allNotes = client.videoData.flatMap(vid => (vid.notes || []).map(n => ({ ...n, videoTitle: vid.title })));
+                                    if (allNotes.length === 0) return <div style={{ fontSize: 12, color: "#9B9B9B", padding: "8px 0" }}>No history entries yet.</div>;
+                                    return (
+                                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                        {allNotes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((n, i) => {
+                                          const actionColor = n.from === "Production" ? "#1A73E8" : n.from === "Publishing" ? "#4DAB9A" : "#9B9B9B";
+                                          return (
+                                            <div key={i} style={{ padding: "8px 12px", background: "#FFFFFF", borderRadius: 6, borderLeft: `3px solid ${actionColor}`, fontSize: 12 }}>
+                                              <span style={{ color: "#9B9B9B", fontSize: 11 }}>{new Date(n.date).toLocaleDateString()} — {n.from} — {n.videoTitle}</span>
+                                              <div style={{ color: "#1A1A1A", marginTop: 2 }}>{n.text}</div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -651,6 +768,40 @@ export default function ProductionPage({
           );
         })}
       </div>
+
+      {/* Notes Modal */}
+      {noteModalVideoId && (() => {
+        const video = videos.find(v => v.id === noteModalVideoId);
+        if (!video) return null;
+        return (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }} onClick={() => { setNoteModalVideoId(null); setNoteText(""); }}>
+            <div style={{ background: "#FFF", borderRadius: 12, width: 480, maxWidth: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #E3E3E0" }}>
+                <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Notes — {video.title}</h3>
+              </div>
+              <div style={{ flex: 1, overflow: "auto", padding: "16px 24px" }}>
+                {(video.notes || []).length === 0 ? (
+                  <div style={{ textAlign: "center", color: "#9B9B9B", padding: "24px 0", fontSize: 13 }}>No notes yet</div>
+                ) : (
+                  video.notes.map((n, i) => (
+                    <div key={i} style={{ padding: "10px 0", borderBottom: i < video.notes.length - 1 ? "1px solid #EBEBEA" : "none" }}>
+                      <div style={{ fontSize: 11, color: "#9B9B9B", marginBottom: 4 }}>{new Date(n.date).toLocaleDateString()} — {n.from}</div>
+                      <div style={{ fontSize: 13, color: "#1A1A1A" }}>{n.text}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div style={{ padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
+                <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} style={{ width: "100%", padding: "10px 12px", border: "1px solid #E3E3E0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                  <button onClick={() => { setNoteModalVideoId(null); setNoteText(""); }} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "transparent", color: "#6B6B6B", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={() => { if (!noteText.trim()) return; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: "Production", date: new Date().toISOString(), text: noteText.trim() }] } : v)); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Confirm Modal */}
       {deletingVideo && (

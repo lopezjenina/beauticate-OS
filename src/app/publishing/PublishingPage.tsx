@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState } from "react";
 import { Video } from "@/lib/types";
 import { TEAM, INIT_CLIENTS } from "@/lib/store";
 import { PageHeader, Badge, Btn, Avatar, Stat } from "@/components/ui";
@@ -18,8 +18,9 @@ export default function PublishingPage({ videos, setVideos }: Props) {
     new Set([1, 2, 3, 4])
   );
 
-  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [noteModalVideoId, setNoteModalVideoId] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const publishingVideos = videos.filter(
     (v) => v.editingStatus === "approved" && v.sentToGuido === true
@@ -357,17 +358,17 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                             const isPosted =
                               video.postingStatus === "posted";
                             const sc = statusColor(video.postingStatus);
-                            const publishingNote = (video.notes || []).find(n => n.from === "publishing")?.text || "";
-
                             return (
+                              <React.Fragment key={video.id}>
                               <tr
-                                key={video.id}
+                                onClick={() => setExpandedRowId(expandedRowId === video.id ? null : video.id)}
                                 style={{
                                   borderBottom: "1px solid #F0F0EE",
                                   backgroundColor: isPosted
                                     ? "#F6FBF7"
-                                    : "transparent",
+                                    : expandedRowId === video.id ? "#F0F0EE" : "transparent",
                                   transition: "background-color 0.15s",
+                                  cursor: "pointer",
                                 }}
                               >
                                 {/* Video Title + Client */}
@@ -579,63 +580,67 @@ export default function PublishingPage({ videos, setVideos }: Props) {
 
                                 {/* Notes */}
                                 <td style={{ padding: "14px 16px", minWidth: 140 }}>
-                                  {expandedNoteId === video.id ? (
-                                    <textarea
-                                      ref={noteRef}
-                                      autoFocus
-                                      rows={3}
-                                      defaultValue={publishingNote}
-                                      onBlur={(e) => {
-                                        const text = e.target.value;
-                                        setVideos((prev) =>
-                                          prev.map((v) => {
-                                            if (v.id !== video.id) return v;
-                                            const otherNotes = (v.notes || []).filter(n => n.from !== "publishing");
-                                            const updatedNotes = text
-                                              ? [...otherNotes, { from: "publishing", date: new Date().toISOString().split("T")[0], text }]
-                                              : otherNotes;
-                                            return { ...v, notes: updatedNotes };
-                                          })
-                                        );
-                                        setExpandedNoteId(null);
-                                      }}
+                                  {(video.notes || []).length > 0 ? (
+                                    <span
+                                      onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(video.id); }}
                                       style={{
-                                        padding: "5px 8px",
-                                        fontSize: 12,
-                                        border: "1px solid #4DAB9A",
-                                        borderRadius: 6,
-                                        fontFamily: "inherit",
-                                        color: "#1A1A1A",
-                                        background: "#FFFFFF",
-                                        outline: "none",
-                                        width: "100%",
-                                        boxSizing: "border-box" as const,
-                                        resize: "none",
+                                        fontSize: 12, fontWeight: 600, color: "#4DAB9A",
+                                        cursor: "pointer", padding: "3px 10px", borderRadius: 12,
+                                        background: "#EAF5F2", whiteSpace: "nowrap",
                                       }}
-                                    />
-                                  ) : (
-                                    <div
-                                      onClick={() => setExpandedNoteId(video.id)}
-                                      style={{
-                                        padding: "5px 8px",
-                                        fontSize: 12,
-                                        color: publishingNote ? "#1A1A1A" : "#9B9B9B",
-                                        cursor: "pointer",
-                                        borderRadius: 6,
-                                        border: "1px solid transparent",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                        maxWidth: 180,
-                                      }}
-                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#E3E3E0"; }}
-                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "transparent"; }}
                                     >
-                                      {publishingNote || "Add note..."}
-                                    </div>
+                                      {video.notes.length} note{video.notes.length !== 1 ? "s" : ""}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(video.id); }}
+                                      style={{
+                                        fontSize: 12, color: "#9B9B9B", cursor: "pointer",
+                                        fontWeight: 500,
+                                      }}
+                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#4DAB9A"; }}
+                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#9B9B9B"; }}
+                                    >
+                                      + Add note
+                                    </span>
                                   )}
                                 </td>
                               </tr>
+                              {/* Expandable History Row */}
+                              {expandedRowId === video.id && (
+                                <tr>
+                                  <td colSpan={8} style={{ padding: 0 }}>
+                                    <div style={{
+                                      background: "#F7F7F5", padding: "16px 24px",
+                                      borderTop: "1px solid #E3E3E0",
+                                    }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>History</div>
+                                      {(video.notes || []).length === 0 ? (
+                                        <div style={{ fontSize: 12, color: "#9B9B9B", padding: "8px 0" }}>No history entries yet.</div>
+                                      ) : (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                          {video.notes.map((n, i) => {
+                                            const actionColor = n.from === "Publishing" ? "#4DAB9A" : n.from === "publishing" ? "#4DAB9A" : "#1A73E8";
+                                            return (
+                                              <div key={i} style={{
+                                                padding: "8px 12px", background: "#FFFFFF",
+                                                borderRadius: 6, borderLeft: `3px solid ${actionColor}`,
+                                                fontSize: 12,
+                                              }}>
+                                                <span style={{ color: "#9B9B9B", fontSize: 11 }}>
+                                                  {new Date(n.date).toLocaleDateString()} — {n.from}
+                                                </span>
+                                                <div style={{ color: "#1A1A1A", marginTop: 2 }}>{n.text}</div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                              </React.Fragment>
                             );
                           })}
                         </tbody>
@@ -647,6 +652,40 @@ export default function PublishingPage({ videos, setVideos }: Props) {
             );
           })}
         </div>
+
+        {/* Notes Modal */}
+        {noteModalVideoId && (() => {
+          const video = videos.find(v => v.id === noteModalVideoId);
+          if (!video) return null;
+          return (
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }} onClick={() => { setNoteModalVideoId(null); setNoteText(""); }}>
+              <div style={{ background: "#FFF", borderRadius: 12, width: 480, maxWidth: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: "20px 24px", borderBottom: "1px solid #E3E3E0" }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Notes — {video.title}</h3>
+                </div>
+                <div style={{ flex: 1, overflow: "auto", padding: "16px 24px" }}>
+                  {(video.notes || []).length === 0 ? (
+                    <div style={{ textAlign: "center", color: "#9B9B9B", padding: "24px 0", fontSize: 13 }}>No notes yet</div>
+                  ) : (
+                    video.notes.map((n, i) => (
+                      <div key={i} style={{ padding: "10px 0", borderBottom: i < video.notes.length - 1 ? "1px solid #EBEBEA" : "none" }}>
+                        <div style={{ fontSize: 11, color: "#9B9B9B", marginBottom: 4 }}>{new Date(n.date).toLocaleDateString()} — {n.from}</div>
+                        <div style={{ fontSize: 13, color: "#1A1A1A" }}>{n.text}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div style={{ padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
+                  <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} style={{ width: "100%", padding: "10px 12px", border: "1px solid #E3E3E0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                    <button onClick={() => { setNoteModalVideoId(null); setNoteText(""); }} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "transparent", color: "#6B6B6B", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                    <button onClick={() => { if (!noteText.trim()) return; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: "Publishing", date: new Date().toISOString(), text: noteText.trim() }] } : v)); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

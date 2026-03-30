@@ -3,8 +3,8 @@ import { AssistLoopWidget } from "@/components/AssistLoopWidget";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agency OS",
-  description: "Internal operating system",
+  title: "Viral Vision OS",
+  description: "Agency operating system — www.viralvisionmk.com",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

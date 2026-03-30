@@ -178,6 +178,7 @@ export default function App() {
         currentPage={page}
         onNavigate={setPage}
         userName={user.name}
+        userRole={user.role}
         approvalCount={approvalCount}
         onSignOut={() => setUser(null)}
         videos={videos}

@@ -19,14 +19,16 @@ interface NewCampaignForm {
 }
 
 const cellInputStyle: React.CSSProperties = {
-  padding: "4px 8px",
+  padding: "6px 10px",
   fontSize: "0.85rem",
-  border: "1px solid #E3E3E0",
-  borderRadius: 4,
+  border: "1px solid #D0D0CE",
+  borderRadius: 6,
   fontFamily: "inherit",
   width: "100%",
   boxSizing: "border-box" as const,
   background: "#FFF",
+  outline: "none",
+  transition: "border-color 0.15s",
 };
 
 export default function AdsPage({
@@ -45,6 +47,7 @@ export default function AdsPage({
   const [deletingCampaign, setDeletingCampaign] = useState<AdCampaign | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editRowData, setEditRowData] = useState<any>(null);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
   const [formData, setFormData] = useState<NewCampaignForm>({
     clientId: clients[0]?.id || '',
@@ -257,8 +260,20 @@ export default function AdsPage({
           <tbody>
             {filteredAds.map((ad) => {
               const isEditing = editingRowId === ad.id;
+              const isHovered = hoveredRowId === ad.id;
               return (
-                <tr key={ad.id} style={{ borderBottom: '1px solid #E3E3E0', backgroundColor: isEditing ? '#FAFAF8' : undefined }}>
+                <tr
+                  key={ad.id}
+                  style={{
+                    borderBottom: '1px solid #E3E3E0',
+                    backgroundColor: isEditing ? '#F8F7FF' : isHovered ? '#FAFAF8' : undefined,
+                    outline: isEditing ? '2px solid #5B5FC7' : 'none',
+                    borderRadius: isEditing ? 8 : 0,
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={() => { if (!isEditing) setHoveredRowId(ad.id); }}
+                  onMouseLeave={() => setHoveredRowId(null)}
+                >
                   {/* Client Name */}
                   <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', color: '#1A1A1A', fontWeight: '500' }}>
                     {isEditing ? (
@@ -401,20 +416,26 @@ export default function AdsPage({
                         <button
                           onClick={handleSaveInlineEdit}
                           style={{
-                            border: 'none', background: '#1A1A1A', color: '#FFFFFF',
-                            fontSize: '0.8rem', cursor: 'pointer', padding: '4px 10px',
-                            borderRadius: 4, fontFamily: 'inherit', fontWeight: 500,
+                            border: 'none', background: '#5B5FC7', color: '#FFFFFF',
+                            fontSize: '0.8rem', cursor: 'pointer', padding: '6px 14px',
+                            borderRadius: 6, fontFamily: 'inherit', fontWeight: 600,
+                            transition: 'background 0.15s',
                           }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#4A4EB3'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#5B5FC7'; }}
                         >
                           Save
                         </button>
                         <button
                           onClick={handleCancelInlineEdit}
                           style={{
-                            border: '1px solid #E3E3E0', background: '#FFFFFF', color: '#6B6B6B',
-                            fontSize: '0.8rem', cursor: 'pointer', padding: '4px 10px',
-                            borderRadius: 4, fontFamily: 'inherit',
+                            border: 'none', background: 'transparent', color: '#6B6B6B',
+                            fontSize: '0.8rem', cursor: 'pointer', padding: '6px 14px',
+                            borderRadius: 6, fontFamily: 'inherit', fontWeight: 500,
+                            transition: 'color 0.15s',
                           }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#1A1A1A'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#6B6B6B'; }}
                         >
                           Cancel
                         </button>
@@ -423,18 +444,30 @@ export default function AdsPage({
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                         <button
                           onClick={() => handleEditCampaign(ad)}
-                          style={{ border: 'none', background: 'transparent', color: '#6B6B6B', fontSize: '0.8rem', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontFamily: 'inherit' }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#F0F0EE'; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                          style={{
+                            border: 'none', background: 'transparent',
+                            color: isHovered ? '#6B6B6B' : '#C0C0BC',
+                            fontSize: '0.8rem', cursor: 'pointer', padding: '4px 8px',
+                            borderRadius: 4, fontFamily: 'inherit',
+                            transition: 'color 0.15s, background 0.15s',
+                          }}
+                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#F0F0EE'; (e.currentTarget as HTMLElement).style.color = '#1A1A1A'; }}
+                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = isHovered ? '#6B6B6B' : '#C0C0BC'; }}
                         >
                           Edit
                         </button>
                         {canDelete && (
                           <button
                             onClick={() => setDeletingCampaign(ad)}
-                            style={{ border: 'none', background: 'transparent', color: '#EB5757', fontSize: '0.8rem', cursor: 'pointer', padding: '4px 8px', borderRadius: 4, fontFamily: 'inherit' }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FDECEC'; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            style={{
+                              border: 'none', background: 'transparent',
+                              color: isHovered ? '#EB5757' : '#C0C0BC',
+                              fontSize: '0.8rem', cursor: 'pointer', padding: '4px 8px',
+                              borderRadius: 4, fontFamily: 'inherit',
+                              transition: 'color 0.15s, background 0.15s',
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#FDECEC'; (e.currentTarget as HTMLElement).style.color = '#EB5757'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = isHovered ? '#EB5757' : '#C0C0BC'; }}
                           >
                             Delete
                           </button>

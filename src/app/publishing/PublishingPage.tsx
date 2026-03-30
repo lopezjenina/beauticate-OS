@@ -127,16 +127,22 @@ export default function PublishingPage({ videos, setVideos }: Props) {
     }
   };
 
-  const platformLabel = (platform: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      instagram: { label: "IG", color: "#E1306C" },
-      youtube: { label: "YT", color: "#FF0000" },
-      tiktok: { label: "TT", color: "#010101" },
-      facebook: { label: "FB", color: "#1877F2" },
-      linkedin: { label: "LI", color: "#0A66C2" },
-    };
-    const key = platform.toLowerCase();
-    return map[key] || { label: platform.slice(0, 2).toUpperCase(), color: "#6B6B6B" };
+  const PLATFORMS = ["Instagram", "TikTok", "Facebook", "YouTube"];
+
+  const platformColor = (platform: string) => {
+    switch (platform) {
+      case "Instagram": return "#E1306C";
+      case "TikTok": return "#010101";
+      case "Facebook": return "#1877F2";
+      case "YouTube": return "#FF0000";
+      default: return "#6B6B6B";
+    }
+  };
+
+  const handleVideoUpdate = (videoId: string, field: string, value: any) => {
+    setVideos((prev) =>
+      prev.map((v) => (v.id === videoId ? { ...v, [field]: value } : v))
+    );
   };
 
   return (
@@ -324,6 +330,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                               "Thumbnail",
                               "Scheduled Date",
                               "Status",
+                              "Notes",
                             ].map((h) => (
                               <th
                                 key={h}
@@ -347,7 +354,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                             const isPosted =
                               video.postingStatus === "posted";
                             const sc = statusColor(video.postingStatus);
-                            const pl = platformLabel(video.platform);
+                            const publishingNote = (video.notes || []).find(n => n.from === "publishing")?.text || "";
 
                             return (
                               <tr
@@ -363,13 +370,13 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 {/* Video Title + Client */}
                                 <td
                                   style={{
-                                    padding: "12px 16px",
+                                    padding: "14px 16px",
                                     minWidth: 180,
                                   }}
                                 >
                                   <div
                                     style={{
-                                      fontWeight: 500,
+                                      fontWeight: 600,
                                       color: "#1A1A1A",
                                       fontSize: 13,
                                       lineHeight: 1.3,
@@ -388,26 +395,36 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                   </div>
                                 </td>
 
-                                {/* Platform Badge */}
-                                <td style={{ padding: "12px 16px" }}>
-                                  <span
-                                    style={{
-                                      display: "inline-block",
-                                      fontSize: 10,
-                                      fontWeight: 700,
-                                      color: "#FFFFFF",
-                                      backgroundColor: pl.color,
-                                      padding: "3px 8px",
-                                      borderRadius: 4,
-                                      letterSpacing: "0.04em",
-                                    }}
-                                  >
-                                    {pl.label}
-                                  </span>
+                                {/* Platform Multi-Select Pills */}
+                                <td style={{ padding: "14px 16px" }}>
+                                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                    {PLATFORMS.map(p => {
+                                      const isActive = (video.platform || "").split(",").map(s => s.trim()).includes(p);
+                                      return (
+                                        <button
+                                          key={p}
+                                          onClick={() => {
+                                            const current = (video.platform || "").split(",").map(s => s.trim()).filter(Boolean);
+                                            const updated = isActive ? current.filter(x => x !== p) : [...current, p];
+                                            handleVideoUpdate(video.id, "platform", updated.join(", "));
+                                          }}
+                                          style={{
+                                            padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
+                                            border: isActive ? "none" : "1px solid #E3E3E0",
+                                            background: isActive ? platformColor(p) + "18" : "transparent",
+                                            color: isActive ? platformColor(p) : "#9B9B9B",
+                                            cursor: "pointer", fontFamily: "inherit",
+                                          }}
+                                        >
+                                          {p}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </td>
 
                                 {/* Editor */}
-                                <td style={{ padding: "12px 16px" }}>
+                                <td style={{ padding: "14px 16px" }}>
                                   <div
                                     style={{
                                       display: "flex",
@@ -434,7 +451,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 </td>
 
                                 {/* Caption Toggle */}
-                                <td style={{ padding: "12px 16px" }}>
+                                <td style={{ padding: "14px 16px" }}>
                                   <button
                                     onClick={() => toggleCaption(video.id)}
                                     style={{
@@ -462,7 +479,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 </td>
 
                                 {/* Thumbnail Toggle */}
-                                <td style={{ padding: "12px 16px" }}>
+                                <td style={{ padding: "14px 16px" }}>
                                   <button
                                     onClick={() => toggleThumbnail(video.id)}
                                     style={{
@@ -490,7 +507,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 </td>
 
                                 {/* Scheduled Date */}
-                                <td style={{ padding: "12px 16px" }}>
+                                <td style={{ padding: "14px 16px" }}>
                                   <input
                                     type="date"
                                     value={video.scheduledDate || ""}
@@ -515,7 +532,7 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                 </td>
 
                                 {/* Posting Status */}
-                                <td style={{ padding: "12px 16px" }}>
+                                <td style={{ padding: "14px 16px" }}>
                                   <div
                                     style={{
                                       display: "flex",
@@ -569,6 +586,41 @@ export default function PublishingPage({ videos, setVideos }: Props) {
                                       </span>
                                     )}
                                   </div>
+                                </td>
+
+                                {/* Notes */}
+                                <td style={{ padding: "14px 16px" }}>
+                                  <input
+                                    type="text"
+                                    value={publishingNote}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setVideos((prev) =>
+                                        prev.map((v) => {
+                                          if (v.id !== video.id) return v;
+                                          const otherNotes = (v.notes || []).filter(n => n.from !== "publishing");
+                                          const updatedNotes = text
+                                            ? [...otherNotes, { from: "publishing", date: new Date().toISOString().split("T")[0], text }]
+                                            : otherNotes;
+                                          return { ...v, notes: updatedNotes };
+                                        })
+                                      );
+                                    }}
+                                    placeholder="Add note..."
+                                    style={{
+                                      padding: "5px 8px",
+                                      fontSize: 12,
+                                      border: "1px solid #E3E3E0",
+                                      borderRadius: 6,
+                                      fontFamily: "inherit",
+                                      color: "#1A1A1A",
+                                      background: "#FFFFFF",
+                                      outline: "none",
+                                      minWidth: 120,
+                                      width: "100%",
+                                      boxSizing: "border-box" as const,
+                                    }}
+                                  />
                                 </td>
                               </tr>
                             );

@@ -26,7 +26,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<AppUser | null>(null);
   const [formData, setFormData] = useState({ username: '', email: '', password: '' });
-  const [formRole, setFormRole] = useState<"superadmin" | "admin" | "member">("member");
+  const [formRole, setFormRole] = useState<AppUser["role"]>("member");
   const [formPermissions, setFormPermissions] = useState<Record<string, boolean>>(
     Object.fromEntries(ALL_PAGES.map((p) => [p, true]))
   );
@@ -83,6 +83,9 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
     switch (role) {
       case 'superadmin': return <Badge variant="danger">Super Admin</Badge>;
       case 'admin': return <Badge variant="warning">Admin</Badge>;
+      case 'editor': return <Badge variant="active">Editor</Badge>;
+      case 'videographer': return <Badge variant="active">Videographer</Badge>;
+      case 'social_manager': return <Badge variant="success">Social Manager</Badge>;
       default: return <Badge variant="default">Member</Badge>;
     }
   };
@@ -117,7 +120,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                     <select
                       value={user.role}
                       onChange={(e) => {
-                        const newRole = e.target.value as "superadmin" | "admin" | "member";
+                        const newRole = e.target.value as AppUser["role"];
                         setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, role: newRole } : u));
                       }}
                       style={{ padding: "3px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, fontFamily: "inherit", background: "transparent" }}
@@ -221,10 +224,13 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Role</label>
                 <select
                   value={formRole}
-                  onChange={(e) => setFormRole(e.target.value as "superadmin" | "admin" | "member")}
+                  onChange={(e) => setFormRole(e.target.value as AppUser["role"])}
                   style={{ width: '100%', padding: '0.75rem', border: '1px solid #E3E3E0', borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit' }}
                 >
                   <option value="member">Member</option>
+                  <option value="editor">Editor</option>
+                  <option value="videographer">Videographer</option>
+                  <option value="social_manager">Social Manager</option>
                   <option value="admin">Admin</option>
                   <option value="superadmin">Super Admin</option>
                 </select>

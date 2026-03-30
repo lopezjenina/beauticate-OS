@@ -14,15 +14,38 @@ interface DashboardPageProps {
   ads?: AdCampaign[];
 }
 
-const sectionHeader: React.CSSProperties = {
-  fontSize: 14,
-  fontWeight: 600,
-  color: "var(--text)",
-  marginBottom: 16,
-  marginTop: 32,
-  paddingBottom: 8,
-  borderBottom: "1px solid var(--border)",
+/* ─── Design Tokens ─── */
+const PRIMARY = "#5B5FC7";
+const SECONDARY = "#8B8FD6";
+const LIGHT = "#C5C7F2";
+const ACCENT_GREEN = "#22C55E";
+const ACCENT_ORANGE = "#F59E0B";
+const ACCENT_RED = "#EF4444";
+
+const cardStyle: React.CSSProperties = {
+  background: "#FFF",
+  border: "1px solid #E8E8E6",
+  borderRadius: 12,
+  padding: 24,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
 };
+
+const statValue: React.CSSProperties = {
+  fontSize: 28,
+  fontWeight: 700,
+  letterSpacing: "-0.03em",
+  color: "#1A1A1A",
+};
+
+const statLabel: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 500,
+  color: "#6B6B6B",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+};
+
+const sectionGap = 20;
 
 export default function DashboardPage({
   clients = INIT_CLIENTS,
@@ -65,6 +88,8 @@ export default function DashboardPage({
 
   const activeAds = useMemo(() => ads.filter((a) => a.status === "active").length, [ads]);
 
+  const totalAdSpend = useMemo(() => ads.reduce((sum, a) => sum + a.spent, 0), [ads]);
+
   // ─── Revenue Metrics ───
   const mrr = monthlyRevenue;
   const quarterlyRevenue = mrr * 3;
@@ -92,6 +117,33 @@ export default function DashboardPage({
       .reduce((sum, l) => sum + l.estimatedRevenue, 0);
   }, [leads]);
 
+  // ─── Lead Stage Breakdown ───
+  const leadStages = useMemo(() => {
+    const stages = ["lead", "call", "proposal", "follow_up", "closed_won", "closed_lost"] as const;
+    const stageLabels: Record<string, string> = {
+      lead: "New Lead",
+      call: "Discovery Call",
+      proposal: "Proposal",
+      follow_up: "Follow Up",
+      closed_won: "Closed Won",
+      closed_lost: "Closed Lost",
+    };
+    const stageColors: Record<string, string> = {
+      lead: LIGHT,
+      call: SECONDARY,
+      proposal: PRIMARY,
+      follow_up: ACCENT_ORANGE,
+      closed_won: ACCENT_GREEN,
+      closed_lost: ACCENT_RED,
+    };
+    return stages.map((s) => ({
+      key: s,
+      label: stageLabels[s],
+      count: leads.filter((l) => l.stage === s).length,
+      color: stageColors[s],
+    }));
+  }, [leads]);
+
   // ─── Content Velocity ───
   const videosCompletedThisMonth = useMemo(
     () => videos.filter((v) => v.editingStatus === "approved" || v.posted).length,
@@ -107,6 +159,22 @@ export default function DashboardPage({
     if (videos.length === 0) return 0;
     const withRevisions = videos.filter((v) => v.revisionsUsed > 0).length;
     return Math.round((withRevisions / videos.length) * 100);
+  }, [videos]);
+
+  // ─── Content Pipeline Chart Data ───
+  const contentPipelineData = useMemo(() => {
+    const statuses = ["not_started", "editing", "delivered", "revision", "approved"] as const;
+    const labels: Record<string, string> = {
+      not_started: "Not Started",
+      editing: "Editing",
+      delivered: "Delivered",
+      revision: "Revision",
+      approved: "Approved",
+    };
+    return statuses.map((s) => ({
+      name: labels[s],
+      count: videos.filter((v) => v.editingStatus === s).length,
+    }));
   }, [videos]);
 
   // ─── Team Performance ───
@@ -157,7 +225,7 @@ export default function DashboardPage({
     });
   }, [clients, videos]);
 
-  // ─── Chart Data ───
+  // ─── Editor Chart Data ───
   const chartData = useMemo(() => {
     return EDITORS.map((editor) => {
       const assigned = videos.filter(
@@ -180,199 +248,309 @@ export default function DashboardPage({
     return `$${n.toLocaleString()}`;
   };
 
-  const secondaryStat: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
+  const weeklyPct = WEEKLY_TARGET > 0 ? Math.min(Math.round((videosThisWeek / WEEKLY_TARGET) * 100), 100) : 0;
+
+  const capacityDotColor = (pct: number) => {
+    if (pct > 100) return ACCENT_RED;
+    if (pct > 80) return ACCENT_ORANGE;
+    return ACCENT_GREEN;
   };
 
-  const secondaryLabel: React.CSSProperties = {
-    fontSize: 11,
-    fontWeight: 500,
+  const alertBorderColor = (severity: "danger" | "warning" | "info") => {
+    if (severity === "danger") return ACCENT_RED;
+    if (severity === "warning") return ACCENT_ORANGE;
+    return PRIMARY;
+  };
+
+  /* ─── Progress Ring SVG ─── */
+  const ProgressRing = ({ pct, size = 48 }: { pct: number; size?: number }) => {
+    const stroke = 4;
+    const r = (size - stroke) / 2;
+    const circ = 2 * Math.PI * r;
+    const offset = circ - (pct / 100) * circ;
+    return (
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E8E8E6" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={PRIMARY}
+          strokeWidth={stroke}
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  };
+
+  /* ─── Bottleneck alerts combined ─── */
+  const bottleneckAlerts = useMemo(() => {
+    const alerts: { key: string; severity: "danger" | "warning" | "info"; title: string; detail: string }[] = [];
+    editorsOverCapacity.forEach((item) => {
+      alerts.push({
+        key: `oc-${item.editor.id}`,
+        severity: "danger",
+        title: `${item.editor.name} over capacity`,
+        detail: `${item.assigned}/${item.editor.weeklyVideoCap} videos assigned`,
+      });
+    });
+    contentNotScheduledAhead.slice(0, 5).forEach((v) => {
+      const client = clients.find((c) => c.id === v.clientId);
+      const daysOut = v.scheduledDate
+        ? Math.ceil((new Date(v.scheduledDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      alerts.push({
+        key: `ns-${v.id}`,
+        severity: daysOut !== null && daysOut < 0 ? "danger" : "warning",
+        title: `Content not ready: ${client?.name || "Unknown"}`,
+        detail: daysOut !== null ? `${daysOut} days until scheduled` : "No schedule date",
+      });
+    });
+    clientsStuckSameStage.forEach((c) => {
+      const clientVideos = videos.filter((vv) => vv.clientId === c.id);
+      const stage = clientVideos[0]?.editingStatus || "unknown";
+      alerts.push({
+        key: `stuck-${c.id}`,
+        severity: "warning",
+        title: `${c.name} stuck in stage`,
+        detail: `All videos at "${stage}"`,
+      });
+    });
+    return alerts;
+  }, [editorsOverCapacity, contentNotScheduledAhead, clientsStuckSameStage, clients, videos, today]);
+
+  // ─── Table header cell style ───
+  const thStyle: React.CSSProperties = {
+    textAlign: "left",
+    padding: "12px 20px",
+    fontWeight: 600,
     color: "#6B6B6B",
+    fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: "0.04em",
   };
 
-  const secondaryValue: React.CSSProperties = {
-    fontSize: 18,
-    fontWeight: 600,
-    color: "#1A1A1A",
-    letterSpacing: "-0.01em",
-  };
-
-  const cardStyle: React.CSSProperties = {
-    padding: "28px",
-    background: "#F7F7F5",
-    borderRadius: "8px",
-    border: "1px solid #E3E3E0",
-  };
-
   return (
-    <div style={{ background: "#FFFFFF", minHeight: "100vh", padding: "56px" }}>
-      <PageHeader
-        title="Executive Dashboard"
-        subtitle="At a glance view of agency operations"
-      >
-        <div style={{ display: "flex", gap: 6 }}>
-          <Btn onClick={() => exportClients(clients)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Clients</Btn>
-          <Btn onClick={() => exportLeads(leads)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Leads</Btn>
-          <Btn onClick={() => exportVideos(videos)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Videos</Btn>
-          <Btn onClick={() => exportCampaigns(ads)} style={{ fontSize: 11, padding: "4px 10px" }}>Export Ads</Btn>
-        </div>
-      </PageHeader>
+    <div style={{ background: "#F8F8FA", minHeight: "100vh", padding: "40px 48px" }}>
 
-      {/* ─── Main Stats Grid ─── */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-          gap: "40px",
-          marginBottom: "24px",
-          borderBottom: "1px solid #E3E3E0",
-          paddingBottom: "40px",
-        }}
-      >
-        <Stat label="Total Active Clients" value={activeClients} />
-        <Stat label="Monthly Revenue" value={`$${(monthlyRevenue / 1000).toFixed(1)}K`} />
-        <Stat label="Videos This Week" value={videosThisWeek} />
-        <Stat label="Editor Capacity" value={`${editorCapacity}%`} sub={`${WEEKLY_TARGET} target`} />
-        <Stat label="Content Pending Approval" value={contentPendingApproval} />
-        <Stat label="Ads Active" value={activeAds} />
-      </div>
-
-      {/* ═══════════════ Revenue ═══════════════ */}
-      <div style={sectionHeader}>Revenue</div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "32px",
-          marginBottom: "8px",
-        }}
-      >
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Monthly Recurring Revenue</div>
-          <div style={secondaryValue}>{fmtCurrency(mrr)}</div>
+      {/* ═══════════════ 1. Header Row ═══════════════ */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: sectionGap + 4 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
+            Dashboard
+          </h1>
+          <p style={{ fontSize: 13, color: "#6B6B6B", margin: "4px 0 0" }}>Agency operations at a glance</p>
         </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Quarterly Revenue</div>
-          <div style={secondaryValue}>{fmtCurrency(quarterlyRevenue)}</div>
-        </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Annual Run Rate</div>
-          <div style={secondaryValue}>{fmtCurrency(annualRunRate)}</div>
-        </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Avg Revenue / Client</div>
-          <div style={secondaryValue}>{fmtCurrency(avgRevenuePerClient)}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Period selector (visual) */}
+          <div
+            style={{
+              ...cardStyle,
+              padding: "6px 14px",
+              fontSize: 12,
+              fontWeight: 600,
+              color: PRIMARY,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "default",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PRIMARY} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            This Month
+          </div>
+          <Btn onClick={() => exportClients(clients)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Clients</Btn>
+          <Btn onClick={() => exportLeads(leads)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Leads</Btn>
+          <Btn onClick={() => exportVideos(videos)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Videos</Btn>
+          <Btn onClick={() => exportCampaigns(ads)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Ads</Btn>
         </div>
       </div>
 
-      {/* ═══════════════ Pipeline Health ═══════════════ */}
-      <div style={sectionHeader}>Pipeline</div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "32px",
-          marginBottom: "8px",
-        }}
-      >
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Total Leads</div>
-          <div style={secondaryValue}>{totalLeads}</div>
+      {/* ═══════════════ 2. Top Stats Row ═══════════════ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: sectionGap, marginBottom: sectionGap }}>
+        {/* Active Clients */}
+        <div style={{ ...cardStyle, borderTop: `4px solid ${PRIMARY}`, padding: "20px 24px 24px" }}>
+          <div style={statLabel}>Active Clients</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <div style={statValue}>{activeClients}</div>
+            {activeClients > 0 && (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ACCENT_GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15" />
+              </svg>
+            )}
+          </div>
         </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Conversion Rate</div>
-          <div style={secondaryValue}>{conversionRate}%</div>
+
+        {/* Monthly Revenue */}
+        <div style={{ ...cardStyle, borderTop: `4px solid ${SECONDARY}`, padding: "20px 24px 24px" }}>
+          <div style={statLabel}>Monthly Revenue</div>
+          <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(monthlyRevenue)}</div>
         </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Avg Deal Size</div>
-          <div style={secondaryValue}>{fmtCurrency(avgDealSize)}</div>
+
+        {/* Videos This Week */}
+        <div style={{ ...cardStyle, borderTop: `4px solid ${LIGHT}`, padding: "20px 24px 24px" }}>
+          <div style={statLabel}>Videos This Week</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+            <div style={statValue}>{videosThisWeek}</div>
+            <div style={{ position: "relative", width: 48, height: 48 }}>
+              <ProgressRing pct={weeklyPct} size={48} />
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: 48,
+                  height: 48,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: PRIMARY,
+                }}
+              >
+                {weeklyPct}%
+              </div>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "#6B6B6B", marginTop: 4 }}>of {WEEKLY_TARGET} target</div>
         </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Pipeline Value</div>
-          <div style={secondaryValue}>{fmtCurrency(pipelineValue)}</div>
+
+        {/* Ad Spend */}
+        <div style={{ ...cardStyle, borderTop: `4px solid ${ACCENT_ORANGE}`, padding: "20px 24px 24px" }}>
+          <div style={statLabel}>Ad Spend</div>
+          <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(totalAdSpend)}</div>
+          <div style={{ fontSize: 11, color: "#6B6B6B", marginTop: 4 }}>{activeAds} active campaigns</div>
         </div>
       </div>
 
-      {/* ═══════════════ Content Velocity ═══════════════ */}
-      <div style={sectionHeader}>Content</div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: "32px",
-          marginBottom: "8px",
-        }}
-      >
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Videos Completed This Month</div>
-          <div style={secondaryValue}>{videosCompletedThisMonth}</div>
+      {/* ═══════════════ 3. Charts Row ═══════════════ */}
+      <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: sectionGap, marginBottom: sectionGap }}>
+        {/* Content Pipeline Bar Chart */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 20 }}>
+            Content Pipeline
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={contentPipelineData} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E6" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: "#6B6B6B", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#6B6B6B", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{
+                  background: "#FFFFFF",
+                  border: "1px solid #E8E8E6",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                }}
+              />
+              <Bar dataKey="count" fill={PRIMARY} radius={[6, 6, 0, 0]} name="Videos" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Videos In Progress</div>
-          <div style={secondaryValue}>{videosInProgress}</div>
-        </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Avg Turnaround</div>
-          <div style={secondaryValue}>4.2 days</div>
-        </div>
-        <div style={secondaryStat}>
-          <div style={secondaryLabel}>Revision Rate</div>
-          <div style={secondaryValue}>{revisionRate}%</div>
+
+        {/* Pipeline Health */}
+        <div style={cardStyle}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 20 }}>
+            Pipeline Health
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {leadStages.map((stage) => {
+              const pct = totalLeads > 0 ? Math.round((stage.count / totalLeads) * 100) : 0;
+              return (
+                <div key={stage.key}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "#1A1A1A" }}>{stage.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#6B6B6B" }}>{stage.count} ({pct}%)</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 4, background: "#F0F0EE", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        borderRadius: 4,
+                        background: stage.color,
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #E8E8E6", display: "flex", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Conversion</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: PRIMARY }}>{conversionRate}%</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Pipeline Value</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{fmtCurrency(pipelineValue)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Avg Deal</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{fmtCurrency(avgDealSize)}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ═══════════════ Team Performance ═══════════════ */}
-      <div style={sectionHeader}>Team</div>
-      <div
-        style={{
-          ...cardStyle,
-          padding: 0,
-          overflow: "hidden",
-          marginBottom: "8px",
-        }}
-      >
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: 13,
-          }}
-        >
+      {/* ═══════════════ 4. Revenue Row ═══════════════ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: sectionGap, marginBottom: sectionGap }}>
+        {[
+          { label: "Monthly Recurring Revenue", value: fmtCurrency(mrr) },
+          { label: "Quarterly Revenue", value: fmtCurrency(quarterlyRevenue) },
+          { label: "Annual Run Rate", value: fmtCurrency(annualRunRate) },
+          { label: "Avg Revenue / Client", value: fmtCurrency(avgRevenuePerClient) },
+        ].map((item) => (
+          <div key={item.label} style={cardStyle}>
+            <div style={statLabel}>{item.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginTop: 8, letterSpacing: "-0.02em" }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ═══════════════ 5. Team Performance ═══════════════ */}
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", marginBottom: sectionGap }}>
+        <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+          Team Performance
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 12 }}>
           <thead>
-            <tr
-              style={{
-                background: "#F7F7F5",
-                borderBottom: "1px solid #E3E3E0",
-              }}
-            >
-              <th style={{ textAlign: "left", padding: "12px 20px", fontWeight: 600, color: "#6B6B6B", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Editor
-              </th>
-              <th style={{ textAlign: "right", padding: "12px 20px", fontWeight: 600, color: "#6B6B6B", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Assigned
-              </th>
-              <th style={{ textAlign: "right", padding: "12px 20px", fontWeight: 600, color: "#6B6B6B", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Completed
-              </th>
-              <th style={{ textAlign: "right", padding: "12px 20px", fontWeight: 600, color: "#6B6B6B", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Capacity
-              </th>
+            <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #E8E8E6" }}>
+              <th style={thStyle}>Editor</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Assigned</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Completed</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Capacity</th>
             </tr>
           </thead>
           <tbody>
             {teamData.map((row, idx) => (
               <tr
                 key={row.editor.id}
-                style={{
-                  borderBottom: idx < teamData.length - 1 ? "1px solid #E3E3E0" : "none",
-                }}
+                style={{ borderBottom: idx < teamData.length - 1 ? "1px solid #E8E8E6" : "none" }}
               >
                 <td style={{ padding: "12px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {/* Capacity dot */}
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: capacityDotColor(row.capacityPct),
+                        flexShrink: 0,
+                      }}
+                    />
                     <Avatar initials={row.editor.initials} size={28} />
                     <span style={{ color: "#1A1A1A", fontWeight: 500 }}>{row.editor.name}</span>
                   </div>
@@ -394,114 +572,57 @@ export default function DashboardPage({
         </table>
       </div>
 
-      {/* ═══════════════ Bottlenecks ═══════════════ */}
-      <div style={sectionHeader}>Bottlenecks</div>
-      <div style={{ marginBottom: "48px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "40px" }}>
-          {/* Editors Over Capacity */}
-          <div style={cardStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: "20px" }}>
-              Editors Over Capacity
-            </div>
-            {editorsOverCapacity.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#6B6B6B" }}>All editors within capacity</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {editorsOverCapacity.map((item) => (
-                  <div key={item.editor.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <Avatar initials={item.editor.initials} size={28} />
-                      <div style={{ fontSize: 13, color: "#1A1A1A" }}>{item.editor.name}</div>
-                    </div>
-                    <Badge variant="danger">
-                      {item.assigned}/{item.editor.weeklyVideoCap}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Content Not 7 Days Ahead */}
-          <div style={cardStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: "20px" }}>
-              Content Not 7 Days Ahead
-            </div>
-            {contentNotScheduledAhead.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#6B6B6B" }}>All content scheduled properly</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {contentNotScheduledAhead.slice(0, 5).map((v) => {
-                  const client = clients.find((c) => c.id === v.clientId);
-                  const daysOut = v.scheduledDate
-                    ? Math.ceil(
-                        (new Date(v.scheduledDate).getTime() - today.getTime()) /
-                          (1000 * 60 * 60 * 24)
-                      )
-                    : null;
-                  return (
-                    <div key={v.id} style={{ display: "flex", justifyContent: "space-between" }}>
-                      <div style={{ fontSize: 12, color: "#1A1A1A" }}>{client?.name}</div>
-                      <Badge variant={daysOut !== null && daysOut < 0 ? "danger" : "warning"}>
-                        {daysOut} days
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Clients Stuck in Same Stage */}
-          <div style={cardStyle}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: "20px" }}>
-              Clients Stuck in Same Stage
-            </div>
-            {clientsStuckSameStage.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#6B6B6B" }}>All clients progressing</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {clientsStuckSameStage.map((c) => {
-                  const clientVideos = videos.filter((v) => v.clientId === c.id);
-                  const stage = clientVideos[0]?.editingStatus || "unknown";
-                  return (
-                    <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <Avatar initials={c.initials} size={28} />
-                        <div style={{ fontSize: 13, color: "#1A1A1A" }}>{c.name}</div>
-                      </div>
-                      <Badge variant="warning">{stage}</Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+      {/* ═══════════════ 6. Bottleneck Alerts ═══════════════ */}
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+          Bottleneck Alerts
         </div>
-      </div>
-
-      {/* ═══════════════ Videos Per Editor Chart ═══════════════ */}
-      <div style={{ ...cardStyle, padding: "40px" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: "28px" }}>
-          Videos Per Editor
-        </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E3E3E0" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: "#6B6B6B", fontSize: 12 }} axisLine={false} />
-            <YAxis tick={{ fill: "#6B6B6B", fontSize: 12 }} axisLine={false} />
-            <Tooltip
-              contentStyle={{
-                background: "#FFFFFF",
-                border: "1px solid #E3E3E0",
-                borderRadius: "6px",
-                fontSize: 12,
-              }}
-            />
-            <Bar dataKey="assigned" fill="#CB7F2C" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="completed" fill="#4DAB9A" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {bottleneckAlerts.length === 0 ? (
+          <div style={{ padding: "20px 24px 24px", fontSize: 13, color: "#6B6B6B" }}>
+            No bottlenecks detected -- all systems healthy
+          </div>
+        ) : (
+          <div style={{ padding: "16px 24px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {bottleneckAlerts.map((alert) => (
+              <div
+                key={alert.key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  padding: "12px 16px",
+                  background: "#FAFAFA",
+                  borderRadius: 8,
+                  borderLeft: `4px solid ${alertBorderColor(alert.severity)}`,
+                }}
+              >
+                {/* Icon */}
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: alertBorderColor(alert.severity) + "18",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={alertBorderColor(alert.severity)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{alert.title}</div>
+                  <div style={{ fontSize: 12, color: "#6B6B6B", marginTop: 2 }}>{alert.detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

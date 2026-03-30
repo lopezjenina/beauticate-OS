@@ -15,6 +15,7 @@ import KnowledgePage from "./knowledge/KnowledgePage";
 import UsersPage from "./users/UsersPage";
 import CalendarPage from "./calendar/CalendarPage";
 import ActivityPage from "./activity/ActivityPage";
+import ClientsPage from "./clients/ClientsPage";
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, TEAM, EDITORS,
 } from "@/lib/store";
@@ -59,10 +60,15 @@ export default function App() {
   }, []);
 
   /* ─── Gate: Onboarding → Production ─── */
-  const handleMoveToProduction = useCallback((ob: OnboardingClient) => {
-    const weekCounts = [0, 0, 0, 0];
-    clients.forEach((c) => { if (c.status === "active") weekCounts[c.week - 1]++; });
-    const minWeek = (weekCounts.indexOf(Math.min(...weekCounts)) + 1) as 1 | 2 | 3 | 4;
+  const handleMoveToProduction = useCallback((ob: OnboardingClient, week?: number) => {
+    let assignedWeek: 1 | 2 | 3 | 4;
+    if (week) {
+      assignedWeek = week as 1 | 2 | 3 | 4;
+    } else {
+      const weekCounts = [0, 0, 0, 0];
+      clients.forEach((c) => { if (c.status === "active") weekCounts[c.week - 1]++; });
+      assignedWeek = (weekCounts.indexOf(Math.min(...weekCounts)) + 1) as 1 | 2 | 3 | 4;
+    }
 
     const newClient: Client = {
       id: `c-${Date.now()}`,
@@ -71,8 +77,13 @@ export default function App() {
       monthlyRevenue: 2500,
       assignedEditor: ob.assignedEditor || EDITORS[0].id,
       assignedSocialManager: ob.assignedSocialManager || "sm1",
-      week: minWeek,
+      week: assignedWeek,
       status: "active",
+      contactEmail: ob.contactEmail,
+      phone: ob.phone,
+      package: ob.package,
+      notes: ob.notes,
+      graduatedFrom: ob.id,
     };
     setClients((prev) => [...prev, newClient]);
     setOnboardingClients((prev) => prev.filter((c) => c.id !== ob.id));
@@ -100,6 +111,8 @@ export default function App() {
             canDelete={canDelete}
           />
         );
+      case "clients":
+        return <ClientsPage clients={clients} setClients={setClients} canDelete={canDelete} />;
       case "production":
         return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} />;
       case "approvals":

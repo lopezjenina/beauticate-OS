@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Video, Lead } from '@/lib/types';
 
 interface NotificationBellProps {
@@ -16,6 +16,18 @@ export type Notification = {
 
 export function NotificationBell({ videos, leads }: NotificationBellProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
 
   const notifications = useMemo(() => {
     const notifs: Notification[] = [];
@@ -73,7 +85,7 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={containerRef} style={{ position: "relative" }}>
       <button
         onClick={() => setShowDropdown(!showDropdown)}
         style={{
@@ -102,8 +114,9 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
           borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
           zIndex: 100, maxHeight: 400, overflow: "auto",
         }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #E3E3E0", fontSize: 13, fontWeight: 600 }}>
-            Notifications ({notifications.length})
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #E3E3E0", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Notifications ({notifications.length})</span>
+            <button onClick={() => { setShowDropdown(false); }} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Dismiss all</button>
           </div>
           {notifications.length === 0 ? (
             <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "#9B9B9B" }}>
@@ -111,16 +124,21 @@ export function NotificationBell({ videos, leads }: NotificationBellProps) {
             </div>
           ) : (
             notifications.map(n => (
-              <div key={n.id} style={{
+              <button key={n.id} style={{
                 padding: "10px 16px", borderBottom: "1px solid #EBEBEA",
                 display: "flex", alignItems: "center", gap: 10,
-              }}>
+                width: "100%", border: "none", background: "transparent",
+                cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+              }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#F7F7F5"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
                 <div style={{
                   width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
                   background: typeColors[n.type],
                 }} />
                 <span style={{ fontSize: 13, color: "#1A1A1A" }}>{n.message}</span>
-              </div>
+              </button>
             ))
           )}
         </div>

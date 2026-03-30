@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Avatar, Badge, Btn, Checkbox, PageHeader, Stat } from '@/components/ui';
+import { Avatar, Badge, Btn, Checkbox, ConfirmModal, PageHeader, Stat } from '@/components/ui';
 import { Client, Video } from '@/lib/types';
 import { TEAM, EDITORS } from '@/lib/store';
 
@@ -9,6 +9,7 @@ interface ProductionPageProps {
   clients: Client[];
   videos: Video[];
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
+  canDelete?: boolean;
 }
 
 type EditingStatus = 'Not Started' | 'Editing' | 'Delivered' | 'Revision' | 'Approved';
@@ -50,8 +51,10 @@ export default function ProductionPage({
   clients,
   videos,
   setVideos,
+  canDelete,
 }: ProductionPageProps) {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
+  const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
   const [selectedClientForVideo, setSelectedClientForVideo] = useState<Client | null>(null);
   const [videoFormData, setVideoFormData] = useState({ title: "", platform: "Instagram", shootDate: "", dueDate: "" });
@@ -448,6 +451,21 @@ export default function ProductionPage({
                         >
                           Revisions Used
                         </th>
+                        {canDelete && (
+                          <th
+                            style={{
+                              padding: '12px 24px',
+                              textAlign: 'center',
+                              fontWeight: '600',
+                              color: '#1A1A1A',
+                              fontSize: '12px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}
+                          >
+                            Delete
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -597,6 +615,28 @@ export default function ProductionPage({
                                 style={inlineNumberStyle}
                               />
                             </td>
+
+                            {/* Delete */}
+                            {canDelete && (
+                              <td style={{ padding: '16px 24px', textAlign: 'center' }}>
+                                <button
+                                  onClick={() => firstVideo && setDeletingVideo(firstVideo)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#EB5757',
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    fontFamily: 'inherit',
+                                    padding: '4px 8px',
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -608,6 +648,21 @@ export default function ProductionPage({
           );
         })}
       </div>
+
+      {/* Delete Confirm Modal */}
+      {deletingVideo && (
+        <ConfirmModal
+          title="Delete Video"
+          message="This will permanently remove this video from production."
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={() => {
+            setVideos(prev => prev.filter(v => v.id !== deletingVideo.id));
+            setDeletingVideo(null);
+          }}
+          onCancel={() => setDeletingVideo(null)}
+        />
+      )}
 
       {/* Add Video Modal */}
       {showAddVideoModal && (

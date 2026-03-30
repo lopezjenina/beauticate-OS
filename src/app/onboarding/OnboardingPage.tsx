@@ -8,7 +8,7 @@ import { TEAM } from '@/lib/store';
 interface OnboardingPageProps {
   onboardingClients: OnboardingClient[];
   setOnboardingClients: (fn: (prev: OnboardingClient[]) => OnboardingClient[]) => void;
-  onMoveToProduction: (client: OnboardingClient) => void;
+  onMoveToProduction: (client: OnboardingClient, week: number) => void;
   canDelete?: boolean;
 }
 
@@ -20,6 +20,8 @@ export default function OnboardingPage({
 }: OnboardingPageProps) {
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [deletingClient, setDeletingClient] = useState<OnboardingClient | null>(null);
+  const [movingClient, setMovingClient] = useState<OnboardingClient | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
 
   const checklistItems = [
     { id: 'contractSigned', label: 'Contract Signed' },
@@ -331,7 +333,7 @@ export default function OnboardingPage({
                         </button>
                       )}
                       <Btn
-                        onClick={() => onMoveToProduction(client)}
+                        onClick={() => { setMovingClient(client); setSelectedWeek(1); }}
                         disabled={!isComplete}
                         style={{
                           flex: 1,
@@ -367,6 +369,44 @@ export default function OnboardingPage({
             setDeletingClient(null);
           }}
           onCancel={() => setDeletingClient(null)}
+        />
+      )}
+
+      {movingClient && (
+        <ConfirmModal
+          title="Move to Production"
+          message={
+            <div>
+              <p style={{ marginBottom: 12 }}>
+                Move <strong>{movingClient.name}</strong> to production? This will create a client entry and assign them to a week.
+              </p>
+              <label style={{ fontSize: 13, color: '#6B6B6B', display: 'block', marginBottom: 4 }}>Assign to Week</label>
+              <select
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(Number(e.target.value))}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 6,
+                  border: '1px solid #E3E3E0',
+                  backgroundColor: '#FFFFFF',
+                  fontSize: 13,
+                  color: '#1A1A1A',
+                  cursor: 'pointer',
+                  width: '100%',
+                }}
+              >
+                <option value={1}>Week 1</option>
+                <option value={2}>Week 2</option>
+                <option value={3}>Week 3</option>
+                <option value={4}>Week 4</option>
+              </select>
+            </div>
+          }
+          onConfirm={() => {
+            onMoveToProduction(movingClient, selectedWeek);
+            setMovingClient(null);
+          }}
+          onCancel={() => setMovingClient(null)}
         />
       )}
     </div>

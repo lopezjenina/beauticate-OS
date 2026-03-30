@@ -14,6 +14,8 @@ export default function CalendarPage({
   clients = INIT_CLIENTS,
   videos = INIT_VIDEOS,
 }: CalendarPageProps) {
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
@@ -63,6 +65,7 @@ export default function CalendarPage({
   }, [clients, videos, currentMonth]);
 
   const prevMonth = () => {
+    setSelectedDay(null);
     setCurrentMonth(prev => prev.month === 0
       ? { year: prev.year - 1, month: 11 }
       : { year: prev.year, month: prev.month - 1 }
@@ -70,6 +73,7 @@ export default function CalendarPage({
   };
 
   const nextMonth = () => {
+    setSelectedDay(null);
     setCurrentMonth(prev => prev.month === 11
       ? { year: prev.year + 1, month: 0 }
       : { year: prev.year, month: prev.month + 1 }
@@ -119,10 +123,16 @@ export default function CalendarPage({
             const day = i + 1;
             const dayEvents = events[day] || [];
             return (
-              <div key={day} style={{
+              <div key={day}
+                onClick={() => { if (dayEvents.length > 0) setSelectedDay(day); }}
+                onMouseEnter={() => { if (dayEvents.length > 0) setHoveredDay(day); }}
+                onMouseLeave={() => setHoveredDay(null)}
+                style={{
                 minHeight: 90, padding: "6px 8px",
                 borderRight: "1px solid #EBEBEA", borderBottom: "1px solid #EBEBEA",
-                background: isToday(day) ? "#E8F0FE" : "#FFF",
+                background: isToday(day) ? "#E8F0FE" : (dayEvents.length > 0 && hoveredDay === day) ? "#F7F7F5" : "#FFF",
+                cursor: dayEvents.length > 0 ? "pointer" : "default",
+                transition: "background 0.15s",
               }}>
                 <div style={{
                   fontSize: 12, fontWeight: isToday(day) ? 700 : 400,
@@ -149,6 +159,28 @@ export default function CalendarPage({
           })}
         </div>
       </div>
+
+      {selectedDay && events[selectedDay] && (
+        <div style={{ marginTop: 24, border: "1px solid #E3E3E0", borderRadius: 8, padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
+              {monthName.split(' ')[0]} {selectedDay} Events
+            </h3>
+            <button onClick={() => setSelectedDay(null)} style={{ border: "none", background: "transparent", color: "#9B9B9B", fontSize: 18, cursor: "pointer" }}>×</button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {events[selectedDay].map((ev, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#F7F7F5", borderRadius: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: ev.color, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{ev.client}</div>
+                  <div style={{ fontSize: 12, color: "#6B6B6B" }}>{ev.type === "shoot" ? "Shoot Day" : ev.type === "due" ? "Due Date" : "Publish Date"}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

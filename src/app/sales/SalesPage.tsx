@@ -260,7 +260,7 @@ export default function SalesPage({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(6, minmax(200px, 1fr))",
+          gridTemplateColumns: "repeat(6, minmax(220px, 1fr))",
           overflowX: "auto",
           gap: "20px",
           marginBottom: "40px",
@@ -275,7 +275,7 @@ export default function SalesPage({
               background: "#F7F7F5",
               borderRadius: "8px",
               border: "1px solid #E3E3E0",
-              padding: "16px 14px",
+              padding: "20px 16px",
               minHeight: "500px",
               display: "flex",
               flexDirection: "column",
@@ -297,7 +297,7 @@ export default function SalesPage({
               {leadsByStage[stage].length}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px", flex: 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px", flex: 1 }}>
               {leadsByStage[stage].map((lead) =>
                 inlineEditId === lead.id ? (
                   /* ---- Inline Edit Card ---- */
@@ -380,7 +380,7 @@ export default function SalesPage({
                     draggable
                     onDragStart={() => handleDragStart(lead)}
                     style={{
-                      padding: "16px 14px",
+                      padding: "18px 16px",
                       background: "#FFFFFF",
                       borderRadius: "6px",
                       border: "1px solid #E3E3E0",
@@ -398,7 +398,7 @@ export default function SalesPage({
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "10px" }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: "4px" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: "4px" }}>
                           {lead.company}
                         </div>
                         <div style={{ fontSize: 12, color: "#6B6B6B" }}>
@@ -440,7 +440,7 @@ export default function SalesPage({
                     )}
 
                     {/* Edit / Delete buttons */}
-                    <div style={{ display: "flex", gap: 6, marginTop: 8, paddingTop: 6, borderTop: "1px solid #EBEBEA" }}>
+                    <div style={{ display: "flex", gap: 6, marginTop: 12, paddingTop: 10, borderTop: "1px solid #EBEBEA" }}>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleEditLead(lead); }}
                         style={{

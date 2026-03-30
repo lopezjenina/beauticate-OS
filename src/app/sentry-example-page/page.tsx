@@ -53,7 +53,7 @@ export default function Page() {
           <a
             target="_blank"
             rel="noopener"
-            href="https://viral-vision.sentry.io/issues/?project=4511132046589952"
+            href="https://viral-vision-mx.sentry.io/issues/?project=4511132328591360"
           >
             Issues Page
           </a>

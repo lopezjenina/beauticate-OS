@@ -21,6 +21,11 @@ export type Client = {
   week: 1 | 2 | 3 | 4;
   status: "active" | "onboarding" | "churned";
   shootDate?: string;
+  contactEmail?: string;
+  phone?: string;
+  package?: string;
+  notes?: string;
+  graduatedFrom?: string; // onboarding client id
 };
 
 export type TeamMember = {

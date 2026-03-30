@@ -154,7 +154,7 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle?: stri
 export function ConfirmModal({
   title, message, confirmLabel = "Delete", onConfirm, onCancel, variant = "danger",
 }: {
-  title: string; message: string; confirmLabel?: string;
+  title: string; message: React.ReactNode; confirmLabel?: string;
   onConfirm: () => void; onCancel: () => void; variant?: "danger" | "primary";
 }) {
   return (

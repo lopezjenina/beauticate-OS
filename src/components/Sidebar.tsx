@@ -13,6 +13,7 @@ const NAV: NavItem[] = [
   { id: "calendar", label: "Calendar", group: "overview" },
   { id: "sales", label: "Sales", group: "pipeline" },
   { id: "onboarding", label: "Onboarding", group: "pipeline" },
+  { id: "clients", label: "Clients", group: "pipeline" },
   { id: "production", label: "Production", group: "operations" },
   { id: "approvals", label: "Approvals", group: "operations" },
   { id: "publishing", label: "Publishing", group: "operations" },

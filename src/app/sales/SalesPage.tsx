@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { Lead, Attachment } from "@/lib/types";
 import { INIT_LEADS } from "@/lib/store";
+import { logActivity } from "@/lib/activityLog";
 import { Avatar, Badge, Btn, PageHeader, FilterPills, EmptyState, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from "@/components/ui";
 
 interface SalesPageProps {
@@ -136,6 +137,7 @@ export default function SalesPage({
     const updated = leads.filter((l) => l.id !== deletingLead.id);
     setInternalLeads(updated);
     setLeads(() => updated);
+    logActivity({ user: "Admin", action: "deleted", entity: "lead", entityName: deletingLead.company });
     setDeletingLead(null);
   };
 
@@ -180,6 +182,7 @@ export default function SalesPage({
       setInternalLeads(updated);
       setLeads(() => updated);
     }
+    logActivity({ user: "Admin", action: editingLead ? "updated" : "created", entity: "lead", entityName: formData.company });
     resetForm();
   };
 

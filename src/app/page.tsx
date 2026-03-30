@@ -55,6 +55,18 @@ export default function App() {
   const canDelete = user ? isAdmin(user.name) : false;
   const isSuperAdminUser = user ? isSuperAdmin(user.name) : false;
 
+  /* ─── Derive team from Users ─── */
+  const editorUsers = useMemo(() =>
+    users.filter(u => u.role === "editor" || u.role === "videographer")
+      .map(u => ({ id: u.id, name: u.username })),
+    [users]
+  );
+  const socialManagerUsers = useMemo(() =>
+    users.filter(u => u.role === "social_manager")
+      .map(u => ({ id: u.id, name: u.username })),
+    [users]
+  );
+
   /* ─── Gate: Sales → Onboarding ─── */
   const handleClosedWon = useCallback((lead: Lead) => {
     const newOb: OnboardingClient = {
@@ -76,7 +88,8 @@ export default function App() {
       },
     };
     setOnboardingClients((prev) => [...prev, newOb]);
-  }, []);
+    if (user) logActivity({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
+  }, [user]);
 
   /* ─── Gate: Onboarding → Production ─── */
   const handleMoveToProduction = useCallback((ob: OnboardingClient, week?: number) => {
@@ -107,7 +120,8 @@ export default function App() {
     };
     setClients((prev) => [...prev, newClient]);
     setOnboardingClients((prev) => prev.filter((c) => c.id !== ob.id));
-  }, [clients]);
+    if (user) logActivity({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
+  }, [clients, user]);
 
   /* ─── Derived counts ─── */
   const approvalCount = videos.filter((v) => v.editingStatus === "delivered").length;
@@ -128,13 +142,15 @@ export default function App() {
             onboardingClients={onboardingClients}
             setOnboardingClients={setOnboardingClients}
             onMoveToProduction={handleMoveToProduction}
+            editors={editorUsers}
+            socialManagers={socialManagerUsers}
             canDelete={canDelete}
           />
         );
       case "clients":
         return <ClientsPage clients={clients} setClients={setClients} canDelete={canDelete} />;
       case "production":
-        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} />;
+        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} editors={editorUsers} canDelete={canDelete} />;
       case "approvals":
         return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} />;
       case "publishing":

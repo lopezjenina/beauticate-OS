@@ -10,6 +10,7 @@ interface ProductionPageProps {
   videos: Video[];
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
   canDelete?: boolean;
+  editors?: { id: string; name: string }[];
 }
 
 type EditingStatus = 'Not Started' | 'Editing' | 'Delivered' | 'Revision' | 'Approved';
@@ -52,7 +53,9 @@ export default function ProductionPage({
   videos,
   setVideos,
   canDelete,
+  editors: editorsProp,
 }: ProductionPageProps) {
+  const editorList = editorsProp || EDITORS.map(e => ({ id: e.id, name: e.name }));
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
   const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
@@ -502,7 +505,7 @@ export default function ProductionPage({
                                   style={inlineSelectStyle}
                                 >
                                   <option value="">Unassigned</option>
-                                  {EDITORS.map((editor) => (
+                                  {editorList.map((editor) => (
                                     <option key={editor.id} value={editor.id}>
                                       {editor.name}
                                     </option>

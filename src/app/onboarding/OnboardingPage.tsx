@@ -10,6 +10,8 @@ interface OnboardingPageProps {
   setOnboardingClients: (fn: (prev: OnboardingClient[]) => OnboardingClient[]) => void;
   onMoveToProduction: (client: OnboardingClient, week: number) => void;
   canDelete?: boolean;
+  editors?: { id: string; name: string }[];
+  socialManagers?: { id: string; name: string }[];
 }
 
 export default function OnboardingPage({
@@ -17,6 +19,8 @@ export default function OnboardingPage({
   setOnboardingClients,
   onMoveToProduction,
   canDelete = false,
+  editors: editorsProp,
+  socialManagers: smProp,
 }: OnboardingPageProps) {
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [deletingClient, setDeletingClient] = useState<OnboardingClient | null>(null);
@@ -97,6 +101,8 @@ export default function OnboardingPage({
   };
 
   const getTeamMembersForRole = (role: string) => {
+    if (role === "editor" && editorsProp) return editorsProp;
+    if (role === "social_manager" && smProp) return smProp;
     return TEAM.filter((member) => member.role === role);
   };
 

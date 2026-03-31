@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Avatar, Badge, Btn, Checkbox, ConfirmModal, PageHeader, Stat, showToast } from '@/components/ui';
 import { Client, Video } from '@/lib/types';
 import { TEAM, EDITORS } from '@/lib/store';
+import { upsertVideo, deleteVideo as deleteVideoDb, updateVideoField } from '@/lib/db';
 
 interface ProductionPageProps {
   clients: Client[];
@@ -163,6 +164,7 @@ export default function ProductionPage({
         video.id === videoId ? { ...video, [property]: value } : video
       )
     );
+    updateVideoField(videoId, property, value);
   };
 
   const handleCreateVideo = () => {
@@ -188,6 +190,7 @@ export default function ProductionPage({
       notes: [],
     };
     setVideos((prev) => [...prev, newVideo]);
+    upsertVideo(newVideo);
     showToast(`"${videoFormData.title}" created`, "success");
     setShowAddVideoModal(false);
     setSelectedClientForVideo(null);
@@ -531,126 +534,49 @@ export default function ProductionPage({
 
                             {/* Shoot Date */}
                             <td style={{ padding: '16px 24px' }}>
-                              <input
-                                type="date"
-                                value={firstVideo?.shootDate || ''}
-                                onChange={(e) =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(firstVideo.id, 'shootDate', e.target.value)
-                                }
-                                style={inlineSelectStyle}
-                              />
+                              {firstVideo ? (
+                                <input type="date" value={firstVideo.shootDate || ''} onChange={(e) => handleVideoPropertyChange(firstVideo.id, 'shootDate', e.target.value)} style={inlineSelectStyle} />
+                              ) : (
+                                <button onClick={(e) => { e.stopPropagation(); setSelectedClientForVideo(client); setShowAddVideoModal(true); }} style={{ fontSize: 12, color: '#5B5FC7', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>+ Add video</button>
+                              )}
                             </td>
 
                             {/* Footage Uploaded */}
                             <td style={{ padding: '16px 24px' }}>
-                              <Checkbox
-                                checked={firstVideo?.footageUploaded || false}
-                                onChange={() =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(
-                                    firstVideo.id,
-                                    'footageUploaded',
-                                    !firstVideo.footageUploaded
-                                  )
-                                }
-                              />
+                              <Checkbox checked={firstVideo?.footageUploaded || false} onChange={() => firstVideo && handleVideoPropertyChange(firstVideo.id, 'footageUploaded', !firstVideo.footageUploaded)} />
                             </td>
 
                             {/* Editing Status */}
                             <td style={{ padding: '16px 24px' }}>
-                              <select
-                                value={firstVideo?.editingStatus || 'not_started'}
-                                onChange={(e) =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(firstVideo.id, 'editingStatus', e.target.value)
-                                }
-                                style={inlineSelectStyle}
-                              >
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
+                              <select value={firstVideo?.editingStatus || 'not_started'} onChange={(e) => firstVideo && handleVideoPropertyChange(firstVideo.id, 'editingStatus', e.target.value)} style={inlineSelectStyle} disabled={!firstVideo}>
+                                {STATUS_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
                               </select>
                             </td>
 
                             {/* Approved */}
                             <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                              {firstVideo?.editingStatus === 'approved' ? (
-                                <Badge variant="success">Yes</Badge>
-                              ) : (
-                                <Badge>No</Badge>
-                              )}
+                              {firstVideo?.editingStatus === 'approved' ? <Badge variant="success">Yes</Badge> : <Badge>No</Badge>}
                             </td>
 
                             {/* Sent to Guido */}
                             <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                              <Checkbox
-                                checked={firstVideo?.sentToGuido || false}
-                                onChange={() =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(
-                                    firstVideo.id,
-                                    'sentToGuido',
-                                    !firstVideo.sentToGuido
-                                  )
-                                }
-                              />
+                              <Checkbox checked={firstVideo?.sentToGuido || false} onChange={() => firstVideo && handleVideoPropertyChange(firstVideo.id, 'sentToGuido', !firstVideo.sentToGuido)} />
                             </td>
 
                             {/* Posted */}
                             <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                              <Checkbox
-                                checked={firstVideo?.posted || false}
-                                onChange={() =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(
-                                    firstVideo.id,
-                                    'posted',
-                                    !firstVideo.posted
-                                  )
-                                }
-                              />
+                              <Checkbox checked={firstVideo?.posted || false} onChange={() => firstVideo && handleVideoPropertyChange(firstVideo.id, 'posted', !firstVideo.posted)} />
                             </td>
 
                             {/* Revisions Used */}
                             <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                              <input
-                                type="number"
-                                min={0}
-                                value={firstVideo?.revisionsUsed || 0}
-                                onChange={(e) =>
-                                  firstVideo &&
-                                  handleVideoPropertyChange(
-                                    firstVideo.id,
-                                    'revisionsUsed',
-                                    parseInt(e.target.value) || 0
-                                  )
-                                }
-                                style={inlineNumberStyle}
-                              />
+                              <input type="number" min={0} value={firstVideo?.revisionsUsed || 0} onChange={(e) => firstVideo && handleVideoPropertyChange(firstVideo.id, 'revisionsUsed', parseInt(e.target.value) || 0)} style={inlineNumberStyle} disabled={!firstVideo} />
                             </td>
 
                             {/* Delete */}
                             {canDelete && (
                               <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                                <button
-                                  onClick={() => firstVideo && setDeletingVideo(firstVideo)}
-                                  style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#EB5757',
-                                    fontSize: 12,
-                                    fontWeight: 500,
-                                    cursor: 'pointer',
-                                    fontFamily: 'inherit',
-                                    padding: '4px 8px',
-                                    borderRadius: 4,
-                                  }}
-                                >
-                                  Delete
-                                </button>
+                                <button onClick={() => firstVideo && setDeletingVideo(firstVideo)} disabled={!firstVideo} style={{ background: 'none', border: 'none', color: firstVideo ? '#EB5757' : '#E3E3E0', fontSize: 12, fontWeight: 500, cursor: firstVideo ? 'pointer' : 'default', fontFamily: 'inherit', padding: '4px 8px', borderRadius: 4 }}>Delete</button>
                               </td>
                             )}
                           </tr>
@@ -816,6 +742,7 @@ export default function ProductionPage({
           onConfirm={() => {
             showToast(`"${deletingVideo.title}" deleted`, "error");
             setVideos(prev => prev.filter(v => v.id !== deletingVideo.id));
+            deleteVideoDb(deletingVideo.id);
             setDeletingVideo(null);
           }}
           onCancel={() => setDeletingVideo(null)}

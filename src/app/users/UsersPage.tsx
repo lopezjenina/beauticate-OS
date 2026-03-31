@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Btn, PageHeader, Badge, ConfirmModal } from '@/components/ui';
 import { AppUser, ALL_PAGES } from '@/lib/auth';
+import { upsertUser, deleteUser as deleteUserDb } from '@/lib/db';
 
 interface UsersPageProps {
   users: AppUser[];
@@ -54,14 +55,16 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
     if (!formData.username || !formData.password) return;
 
     if (editingUser) {
-      setUsers((prev) => prev.map((u) => u.id === editingUser.id ? {
-        ...u,
+      const updatedUser = {
+        ...editingUser,
         username: formData.username,
         email: formData.email,
         password: formData.password,
         role: formRole,
         permissions: formPermissions,
-      } : u));
+      };
+      setUsers((prev) => prev.map((u) => u.id === editingUser.id ? updatedUser : u));
+      upsertUser(updatedUser);
     } else {
       const newUser: AppUser = {
         id: `u-${Date.now()}`,
@@ -72,6 +75,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
         permissions: formPermissions,
       };
       setUsers((prev) => [...prev, newUser]);
+      upsertUser(newUser);
     }
     resetForm();
   };
@@ -79,6 +83,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
   const handleDeleteUser = () => {
     if (!deletingUser) return;
     setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+    deleteUserDb(deletingUser.id);
     setDeletingUser(null);
   };
 
@@ -125,6 +130,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                       onChange={(e) => {
                         const newRole = e.target.value as AppUser["role"];
                         setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, role: newRole } : u));
+                        upsertUser({ ...user, role: newRole });
                       }}
                       style={{ padding: "3px 8px", fontSize: 12, border: "1px solid #E3E3E0", borderRadius: 4, fontFamily: "inherit", background: "transparent" }}
                     >

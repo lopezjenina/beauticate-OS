@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { LoginPage } from "@/components/LoginPage";
 import DashboardPage from "./dashboard/DashboardPage";
@@ -21,6 +21,11 @@ import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, EDITORS,
 } from "@/lib/store";
 import { logActivity } from "@/lib/activityLog";
+import {
+  fetchClients, fetchVideos, fetchLeads, fetchOnboarding, fetchAds, fetchUsers,
+  upsertClient, upsertVideo, upsertLead, upsertOnboarding, upsertAd,
+  deleteOnboarding, deleteVideo, logActivityToDb,
+} from "@/lib/db";
 import { INIT_USERS, isAdmin, isSuperAdmin } from "@/lib/auth";
 import { ToastContainer, CelebrationModal, showToast } from "@/components/ui";
 import type { AppUser } from "@/lib/auth";
@@ -31,7 +36,12 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(() => {
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("agencyos_user");
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Validate session against source-of-truth user list
+        const matched = INIT_USERS.find(u => u.username === parsed.name);
+        if (matched) return { name: matched.username, email: matched.email, role: matched.role };
+      }
     }
     return null;
   });
@@ -63,6 +73,25 @@ export default function App() {
 
   const [celebration, setCelebration] = useState<{ title: string; message: string } | null>(null);
 
+  /* ─── Load data from Supabase on mount (fallback to INIT_* if empty) ─── */
+  useEffect(() => {
+    let mounted = true;
+    async function loadData() {
+      const [dbClients, dbVideos, dbLeads, dbOnboarding, dbAds, dbUsers] = await Promise.all([
+        fetchClients(), fetchVideos(), fetchLeads(), fetchOnboarding(), fetchAds(), fetchUsers()
+      ]);
+      if (!mounted) return;
+      if (dbClients.length > 0) setClients(dbClients);
+      if (dbVideos.length > 0) setVideos(dbVideos);
+      if (dbLeads.length > 0) setLeads(dbLeads);
+      if (dbOnboarding.length > 0) setOnboardingClients(dbOnboarding);
+      if (dbAds.length > 0) setAds(dbAds);
+      if (dbUsers.length > 0) setUsers(dbUsers);
+    }
+    loadData();
+    return () => { mounted = false; };
+  }, []);
+
   /* ─── Admin check ─── */
   const canDelete = user ? isAdmin(user.name) : false;
   const isSuperAdminUser = user ? isSuperAdmin(user.name) : false;
@@ -90,7 +119,14 @@ export default function App() {
       },
     };
     setOnboardingClients((prev) => [...prev, newOb]);
-    if (user) logActivity({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
+    // Persist to Supabase (fire-and-forget)
+    upsertOnboarding(newOb);
+    const updatedLead = { ...lead, stage: "closed_won" as Lead["stage"] };
+    upsertLead(updatedLead);
+    if (user) {
+      logActivity({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
+      logActivityToDb({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
+    }
     setCelebration({ title: "New Deal Closed!", message: `Congratulations! ${lead.company} is now a client. Time to start onboarding!` });
   }, [user]);
 
@@ -123,7 +159,13 @@ export default function App() {
     };
     setClients((prev) => [...prev, newClient]);
     setOnboardingClients((prev) => prev.filter((c) => c.id !== ob.id));
-    if (user) logActivity({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
+    // Persist to Supabase (fire-and-forget)
+    upsertClient(newClient);
+    deleteOnboarding(ob.id);
+    if (user) {
+      logActivity({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
+      logActivityToDb({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
+    }
     setCelebration({ title: `${ob.name} is Live!`, message: `${ob.name} has moved to production in Week ${assignedWeek}. Let's create amazing content!` });
   }, [clients, user]);
 

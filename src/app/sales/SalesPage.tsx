@@ -5,6 +5,7 @@ import { Lead, Attachment } from "@/lib/types";
 import { INIT_LEADS } from "@/lib/store";
 import { logActivity } from "@/lib/activityLog";
 import { Avatar, Badge, Btn, PageHeader, FilterPills, EmptyState, ConfirmModal, FileUploadArea, AttachmentList, LinkInput, showToast } from "@/components/ui";
+import { upsertLead, deleteLead as deleteLeadDb } from "@/lib/db";
 
 interface SalesPageProps {
   leads?: Lead[];
@@ -89,6 +90,7 @@ export default function SalesPage({
       );
       setInternalLeads(updated);
       setLeads(() => updated);
+      upsertLead({ ...draggedLead, stage });
     }
 
     setDraggedLead(null);
@@ -97,13 +99,13 @@ export default function SalesPage({
   const confirmClosedWon = () => {
     if (!showClosedWonConfirm) return;
 
+    const closedLead = { ...showClosedWonConfirm, stage: "closed_won" as const, closeDate: new Date().toISOString().split("T")[0] };
     const updated = leads.map((l) =>
-      l.id === showClosedWonConfirm.id
-        ? { ...l, stage: "closed_won" as const, closeDate: new Date().toISOString().split("T")[0] }
-        : l
+      l.id === showClosedWonConfirm.id ? closedLead : l
     );
     setInternalLeads(updated);
     setLeads(() => updated);
+    upsertLead(closedLead);
     onClosedWon(showClosedWonConfirm);
     setShowClosedWonConfirm(null);
   };
@@ -138,6 +140,7 @@ export default function SalesPage({
     setInternalLeads(updated);
     setLeads(() => updated);
     logActivity({ user: "Admin", action: "deleted", entity: "lead", entityName: deletingLead.company });
+    deleteLeadDb(deletingLead.id);
     showToast(`"${deletingLead.company}" deleted`, "error");
     setDeletingLead(null);
   };
@@ -148,23 +151,23 @@ export default function SalesPage({
     }
 
     if (editingLead) {
+      const editedLead = {
+        ...editingLead,
+        contactName: formData.contactName,
+        company: formData.company,
+        email: formData.email,
+        phone: formData.phone,
+        source: formData.source,
+        estimatedRevenue: parseInt(formData.estimatedRevenue) || 0,
+        notes: formData.notes,
+        attachments: formAttachments.length > 0 ? formAttachments : undefined,
+      };
       const updated = leads.map((l) =>
-        l.id === editingLead.id
-          ? {
-              ...l,
-              contactName: formData.contactName,
-              company: formData.company,
-              email: formData.email,
-              phone: formData.phone,
-              source: formData.source,
-              estimatedRevenue: parseInt(formData.estimatedRevenue) || 0,
-              notes: formData.notes,
-              attachments: formAttachments.length > 0 ? formAttachments : undefined,
-            }
-          : l
+        l.id === editingLead.id ? editedLead : l
       );
       setInternalLeads(updated);
       setLeads(() => updated);
+      upsertLead(editedLead);
     } else {
       const newLead: Lead = {
         id: `l${Date.now()}`,
@@ -182,6 +185,7 @@ export default function SalesPage({
       const updated = [...leads, newLead];
       setInternalLeads(updated);
       setLeads(() => updated);
+      upsertLead(newLead);
     }
     logActivity({ user: "Admin", action: editingLead ? "updated" : "created", entity: "lead", entityName: formData.company });
     showToast(editingLead ? `"${formData.company}" updated` : `"${formData.company}" created`, "success");

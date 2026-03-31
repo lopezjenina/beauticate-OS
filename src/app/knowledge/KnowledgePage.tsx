@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Btn, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from '@/components/ui';
 import { KB_CATEGORIES, KB_DOCS } from '@/lib/store';
 import type { KBDoc, Attachment } from '@/lib/types';
+import { upsertKBDoc, deleteKBDoc as deleteKBDocDb } from '@/lib/db';
 
 export default function KnowledgePage({ canDelete = false }: { canDelete?: boolean } = {}) {
   const [docs, setDocs] = useState<KBDoc[]>(KB_DOCS);
@@ -47,15 +48,17 @@ export default function KnowledgePage({ canDelete = false }: { canDelete?: boole
     if (!formData.title || !formData.body) return;
 
     if (editingDoc) {
-      setDocs((prev) => prev.map((d) => d.id === editingDoc.id ? {
-        ...d,
+      const updatedDoc = {
+        ...editingDoc,
         title: formData.title,
         category: formData.category || selectedCategory,
         author: formData.author,
         body: formData.body,
         updated: new Date().toISOString().split('T')[0],
         attachments: formAttachments.length > 0 ? formAttachments : undefined,
-      } : d));
+      };
+      setDocs((prev) => prev.map((d) => d.id === editingDoc.id ? updatedDoc : d));
+      upsertKBDoc(updatedDoc);
       setSelectedDocId(editingDoc.id);
     } else {
       const newDoc: KBDoc = {
@@ -68,6 +71,7 @@ export default function KnowledgePage({ canDelete = false }: { canDelete?: boole
         attachments: formAttachments.length > 0 ? formAttachments : undefined,
       };
       setDocs((prev) => [...prev, newDoc]);
+      upsertKBDoc(newDoc);
     }
     resetForm();
   };
@@ -75,6 +79,7 @@ export default function KnowledgePage({ canDelete = false }: { canDelete?: boole
   const handleDeleteDoc = () => {
     if (!deletingDoc) return;
     setDocs((prev) => prev.filter((d) => d.id !== deletingDoc.id));
+    deleteKBDocDb(deletingDoc.id);
     if (selectedDocId === deletingDoc.id) setSelectedDocId(null);
     setDeletingDoc(null);
   };

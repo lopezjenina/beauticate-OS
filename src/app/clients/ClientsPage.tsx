@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { ConfirmModal, PageHeader, Stat, FilterPills } from '@/components/ui';
 import type { Client } from '@/lib/types';
+import { upsertClient } from '@/lib/db';
 import { getPackageNames } from '@/app/packages/PackagesPage';
 
 interface ClientsPageProps {
@@ -65,9 +66,12 @@ export default function ClientsPage({ clients, setClients, canDelete = false }: 
     .reduce((sum, c) => sum + c.monthlyRevenue, 0);
 
   const handleFieldChange = (clientId: string, field: keyof Client, value: string | number) => {
-    setClients((prev) =>
-      prev.map((c) => (c.id === clientId ? { ...c, [field]: value } : c))
-    );
+    setClients((prev) => {
+      const updated = prev.map((c) => (c.id === clientId ? { ...c, [field]: value } : c));
+      const updatedClient = updated.find(c => c.id === clientId);
+      if (updatedClient) upsertClient(updatedClient);
+      return updated;
+    });
   };
 
   const inlineSelect: React.CSSProperties = {

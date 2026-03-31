@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Avatar, Badge, Btn, ProgressBar, Checkbox, PageHeader, EmptyState, ConfirmModal } from '@/components/ui';
 import { OnboardingClient } from '@/lib/types';
 import { TEAM } from '@/lib/store';
+import { upsertOnboarding, deleteOnboarding as deleteOnboardingDb } from '@/lib/db';
 import { getPackageNames } from '@/app/packages/PackagesPage';
 
 interface OnboardingPageProps {
@@ -43,8 +44,8 @@ export default function OnboardingPage({
   };
 
   const handleToggleChecklist = (clientId: string, itemId: string) => {
-    setOnboardingClients((prev) =>
-      prev.map((client) =>
+    setOnboardingClients((prev) => {
+      const updated = prev.map((client) =>
         client.id === clientId
           ? {
               ...client,
@@ -54,8 +55,11 @@ export default function OnboardingPage({
               },
             }
           : client
-      )
-    );
+      );
+      const updatedClient = updated.find(c => c.id === clientId);
+      if (updatedClient) upsertOnboarding(updatedClient);
+      return updated;
+    });
   };
 
   const handleSelectTeamMember = (
@@ -63,8 +67,8 @@ export default function OnboardingPage({
     itemId: string,
     memberId: string
   ) => {
-    setOnboardingClients((prev) =>
-      prev.map((client) =>
+    setOnboardingClients((prev) => {
+      const updated = prev.map((client) =>
         client.id === clientId
           ? {
               ...client,
@@ -75,16 +79,22 @@ export default function OnboardingPage({
               [itemId === 'editorAssigned' ? 'assignedEditor' : 'assignedSocialManager']: memberId,
             }
           : client
-      )
-    );
+      );
+      const updatedClient = updated.find(c => c.id === clientId);
+      if (updatedClient) upsertOnboarding(updatedClient);
+      return updated;
+    });
   };
 
   const handleFieldChange = (clientId: string, field: keyof OnboardingClient, value: string) => {
-    setOnboardingClients((prev) =>
-      prev.map((client) =>
+    setOnboardingClients((prev) => {
+      const updated = prev.map((client) =>
         client.id === clientId ? { ...client, [field]: value } : client
-      )
-    );
+      );
+      const updatedClient = updated.find(c => c.id === clientId);
+      if (updatedClient) upsertOnboarding(updatedClient);
+      return updated;
+    });
   };
 
   const inputStyle: React.CSSProperties = {
@@ -372,6 +382,7 @@ export default function OnboardingPage({
           message={`Remove ${deletingClient.name} from onboarding? This cannot be undone.`}
           onConfirm={() => {
             setOnboardingClients((prev) => prev.filter((c) => c.id !== deletingClient.id));
+            deleteOnboardingDb(deletingClient.id);
             if (expandedClientId === deletingClient.id) setExpandedClientId(null);
             setDeletingClient(null);
           }}

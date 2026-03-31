@@ -3,13 +3,25 @@
 import { useState, useEffect } from 'react';
 import { PageHeader, Badge, FilterPills } from '@/components/ui';
 import { getActivityLog, ActivityEntry } from '@/lib/activityLog';
+import { fetchActivityLog } from '@/lib/db';
 
 export default function ActivityPage() {
   const [log, setLog] = useState<ActivityEntry[]>(() => getActivityLog());
   const [filterEntity, setFilterEntity] = useState<string | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setLog(getActivityLog()), 2000);
+    const refresh = () => {
+      const local = getActivityLog();
+      fetchActivityLog().then((remote) => {
+        if (remote.length === 0) { setLog(local); return; }
+        const localIds = new Set(local.map(e => e.id));
+        const merged = [...local, ...remote.filter(e => !localIds.has(e.id))];
+        merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setLog(merged);
+      }).catch(() => setLog(local));
+    };
+    refresh();
+    const interval = setInterval(refresh, 2000);
     return () => clearInterval(interval);
   }, []);
 

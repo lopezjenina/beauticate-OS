@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Btn, PageHeader, Badge, ConfirmModal, FileUploadArea, AttachmentList, LinkInput, showToast } from '@/components/ui';
 import { AdCampaign, Client, Attachment } from '@/lib/types';
+import { upsertAd, deleteAd as deleteAdDb } from '@/lib/db';
 
 type StatusFilter = 'all' | 'active' | 'paused' | 'draft' | 'ended';
 
@@ -128,6 +129,8 @@ export default function AdsPage({
           : ad
       )
     );
+    const updatedAd = ads.find(a => a.id === editingRowId);
+    if (updatedAd) upsertAd({ ...updatedAd, clientId: editRowData.clientId, campaignName: editRowData.campaignName, platform: editRowData.platform, status: editRowData.status, budget: editRowData.budget, spent: editRowData.spent, creative: editRowData.creative, optimizationSchedule: editRowData.optimizationSchedule, notes: editRowData.notes });
     showToast(`"${editRowData.campaignName}" saved`, "success");
     setEditingRowId(null);
     setEditRowData(null);
@@ -153,18 +156,22 @@ export default function AdsPage({
       attachments: formAttachments.length > 0 ? formAttachments : undefined,
     };
     setAds((prev) => [...prev, newCampaign]);
+    upsertAd(newCampaign);
     showToast(`"${formData.campaignName}" created`, "success");
     resetForm();
   };
 
   const toggleStatus = (id: string) => {
+    const ad = ads.find(a => a.id === id);
+    const newStatus = ad?.status === 'active' ? 'paused' : 'active';
     setAds((prev) =>
-      prev.map((ad) =>
-        ad.id === id
-          ? { ...ad, status: ad.status === 'active' ? 'paused' : 'active' }
-          : ad
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, status: newStatus }
+          : a
       )
     );
+    if (ad) upsertAd({ ...ad, status: newStatus });
   };
 
   const handleFilesSelected = (files: { name: string; url: string; type: "image" | "video" | "document" }[]) => {
@@ -640,6 +647,7 @@ export default function AdsPage({
           onConfirm={() => {
             showToast(`"${deletingCampaign.campaignName}" deleted`, "error");
             setAds((prev) => prev.filter((a) => a.id !== deletingCampaign!.id));
+            deleteAdDb(deletingCampaign.id);
             setDeletingCampaign(null);
           }}
           onCancel={() => setDeletingCampaign(null)}

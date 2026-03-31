@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Btn, PageHeader, Badge, ConfirmModal } from '@/components/ui';
+import { upsertPackage, deletePackage as deletePackageDb, fetchPackages } from '@/lib/db';
 
 export type ServicePackage = {
   id: string;
@@ -45,6 +46,25 @@ export default function PackagesPage() {
     return INIT_PACKAGES;
   });
 
+  // Load from Supabase on mount (fallback to sessionStorage/defaults already in state)
+  useEffect(() => {
+    fetchPackages().then((remote) => {
+      if (remote.length > 0) {
+        // Map db shape (active) to local shape (isActive)
+        const mapped = remote.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description || '',
+          price: r.price,
+          billingCycle: (r as any).billingCycle || 'monthly',
+          features: r.features || [],
+          isActive: r.active !== undefined ? r.active : true,
+        }));
+        setPackages(mapped);
+      }
+    }).catch(() => { /* use sessionStorage fallback already in state */ });
+  }, []);
+
   // Persist on change
   useEffect(() => {
     sessionStorage.setItem("agencyos_packages", JSON.stringify(packages));
@@ -71,15 +91,21 @@ export default function PackagesPage() {
     const featuresArr = formData.features.split('\n').map(f => f.trim()).filter(Boolean);
 
     if (editingPkg) {
-      setPackages(prev => prev.map(p => p.id === editingPkg.id ? { ...p, name: formData.name, description: formData.description, price: formData.price, billingCycle: formData.billingCycle, features: featuresArr } : p));
+      const updated = { ...editingPkg, name: formData.name, description: formData.description, price: formData.price, billingCycle: formData.billingCycle, features: featuresArr };
+      setPackages(prev => prev.map(p => p.id === editingPkg.id ? updated : p));
+      upsertPackage({ id: updated.id, name: updated.name, price: updated.price, description: updated.description, features: updated.features, active: updated.isActive });
     } else {
-      setPackages(prev => [...prev, { id: `pkg-${Date.now()}`, name: formData.name, description: formData.description, price: formData.price, billingCycle: formData.billingCycle, features: featuresArr, isActive: true }]);
+      const newPkg = { id: `pkg-${Date.now()}`, name: formData.name, description: formData.description, price: formData.price, billingCycle: formData.billingCycle, features: featuresArr, isActive: true };
+      setPackages(prev => [...prev, newPkg]);
+      upsertPackage({ id: newPkg.id, name: newPkg.name, price: newPkg.price, description: newPkg.description, features: newPkg.features, active: true });
     }
     resetForm();
   };
 
   const toggleActive = (id: string) => {
+    const pkg = packages.find(p => p.id === id);
     setPackages(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
+    if (pkg) upsertPackage({ id: pkg.id, name: pkg.name, price: pkg.price, description: pkg.description, features: pkg.features, active: !pkg.isActive });
   };
 
   return (
@@ -186,7 +212,7 @@ export default function PackagesPage() {
         <ConfirmModal
           title="Delete Package"
           message={`This will permanently remove the "${deletingPkg.name}" package.`}
-          onConfirm={() => { setPackages(prev => prev.filter(p => p.id !== deletingPkg.id)); setDeletingPkg(null); }}
+          onConfirm={() => { setPackages(prev => prev.filter(p => p.id !== deletingPkg.id)); deletePackageDb(deletingPkg.id); setDeletingPkg(null); }}
           onCancel={() => setDeletingPkg(null)}
         />
       )}

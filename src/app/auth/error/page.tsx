@@ -1,13 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 function AuthErrorContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const errorCode = searchParams.get("error_code");
   const isExpired = errorCode === "otp_expired" || errorCode === "401";
+  const [isRecovering, setIsRecovering] = useState(false);
+
+  useEffect(() => {
+    // Recover implicit flow token from hash if available
+    if (window.location.hash.includes("access_token=")) {
+      setIsRecovering(true);
+      supabase.auth.getSession().then(() => {
+        router.replace("/");
+      });
+    }
+  }, [router]);
+
+  if (isRecovering) {
+    return (
+      <div style={{ textAlign: "center", color: "#6B6B6B" }}>
+        <div style={{ fontSize: 24, marginBottom: 16 }}>🔄</div>
+        <h1 style={{ fontSize: 20, color: "#1A1A1A", marginBottom: 8 }}>Authenticating...</h1>
+        <p>Please wait a moment.</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -69,7 +92,7 @@ function AuthErrorContent() {
       </Link>
 
       <p style={{ fontSize: 12, color: "#A0A0A0", margin: 0 }}>
-        Beauticate OS · Secure Access
+        BEAUTICATE. · Secure Access
       </p>
     </div>
   );

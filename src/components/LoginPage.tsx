@@ -99,21 +99,18 @@ export function LoginPage({
         }}
       >
         {/* Logo + Title */}
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 64, height: 64, borderRadius: 16,
-              background: "linear-gradient(135deg, var(--accent), #5AC8FA)",
-              color: "#FFF", fontSize: 24, fontWeight: 700,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 20px", boxShadow: "0 12px 24px rgba(0, 122, 255, 0.3)",
-            }}
-          >
-            B
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <div style={{
+            fontSize: 36,
+            fontWeight: 400,
+            letterSpacing: "0.15em",
+            color: "var(--text)",
+            fontFamily: "'Outfit', sans-serif",
+            margin: "0 0 16px 0",
+            textTransform: "uppercase"
+          }}>
+            BEAUTICATE.
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-            Beauticate OS
-          </h1>
           <p style={{ fontSize: 15, color: "var(--text-sec)", margin: 0, fontWeight: 500 }}>
             Agency Operating System
           </p>
@@ -217,7 +214,7 @@ export function LoginPage({
         )}
 
         <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-ter)", fontWeight: 500 }}>
-          Powered by Beauticate
+          Powered by BEAUTICATE.
         </div>
       </div>
     </div>

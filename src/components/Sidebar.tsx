@@ -114,24 +114,24 @@ export function Sidebar({
       <div style={{ padding: collapsed ? "4px 0" : "4px 10px", marginBottom: 32, textAlign: collapsed ? "center" : "left", display: "flex", alignItems: "center", gap: 12 }}>
         {collapsed ? (
           <div style={{
-            fontSize: 14, fontWeight: 700, width: 40, height: 40, borderRadius: 12,
-            background: "linear-gradient(135deg, var(--accent), #818CF8)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto", boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)"
+            fontSize: 20, fontWeight: 400, color: "var(--text)", 
+            fontFamily: "'Outfit', sans-serif", margin: "0 auto",
+            letterSpacing: "0.05em",
+            textTransform: "uppercase"
           }}>
-            {getInitials(userName)}
+            B.
           </div>
         ) : (
           <>
-            <div style={{
-              fontSize: 14, fontWeight: 700, width: 40, height: 40, borderRadius: 12,
-              background: "linear-gradient(135deg, var(--accent), #5AC8FA)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, boxShadow: "0 8px 16px rgba(0, 122, 255, 0.2)"
-            }}>
-              {getInitials(userName)}
-            </div>
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>Beauticate</div>
-              <div style={{ fontSize: 13, color: "var(--text-ter)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
+            <div style={{ overflow: "hidden", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ 
+                fontSize: 22, fontWeight: 400, letterSpacing: "0.15em", 
+                color: "var(--text)", fontFamily: "'Outfit', sans-serif",
+                textTransform: "uppercase" 
+              }}>
+                BEAUTICATE.
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text-ter)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
                 {userName}
               </div>
             </div>

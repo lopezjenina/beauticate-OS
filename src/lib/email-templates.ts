@@ -50,7 +50,7 @@ export const videoApprovalTemplate = (clientName: string, videoTitle: string, ap
   </p>
   <a href="${approvalUrl}" style="${BUTTON_STYLE}">View & Action Video</a>
   <div style="${FOOTER_STYLE}">
-    &copy; 2026 Beauticate Agency OS. All rights reserved.
+    &copy; 2026 BEAUTICATE. OS. All rights reserved.
   </div>
 </div>
 `;
@@ -73,7 +73,7 @@ export const assignmentTemplate = (staffName: string, clientName: string, dashbo
   </p>
   <a href="${dashboardUrl}" style="${BUTTON_STYLE}">Open Dashboard</a>
   <div style="${FOOTER_STYLE}">
-    &copy; 2026 Beauticate Agency OS. This is an automated notification.
+    &copy; 2026 BEAUTICATE. OS. This is an automated notification.
   </div>
 </div>
 `;
@@ -83,8 +83,8 @@ export const assignmentTemplate = (staffName: string, clientName: string, dashbo
  */
 export const welcomeTemplate = (clientName: string, dashboardUrl: string) => `
 <div style="${BASE_STYLE}">
-  <div style="font-size: 20px; font-weight: 800; color: #000; margin-bottom: 32px; letter-spacing: -0.05em;">
-    BEAUTICATE
+  <div style="font-size: 20px; font-weight: 400; letter-spacing: 0.15em; color: #111827; margin-bottom: 32px; font-family: 'Outfit', sans-serif;">
+    BEAUTICATE.
   </div>
   <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.025em;">
     Welcome to the Agency, ${clientName}
@@ -96,7 +96,7 @@ export const welcomeTemplate = (clientName: string, dashboardUrl: string) => `
   <a href="${dashboardUrl}" style="${BUTTON_STYLE}">Enter Client Portal</a>
   <div style="${FOOTER_STYLE}">
     Best regards,<br>
-    The Beauticate Team
+    The BEAUTICATE. Team
   </div>
 </div>
 `;

@@ -205,8 +205,13 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Beauticate OS</div>
-          <div style={{ fontSize: 14, color: "#6B6B6B" }}>Loading...</div>
+          <div style={{
+            fontSize: 24, fontWeight: 400, letterSpacing: "0.15em", color: "var(--text)", 
+            fontFamily: "'Outfit', sans-serif", textTransform: "uppercase", marginBottom: 8 
+          }}>
+            BEAUTICATE.
+          </div>
+          <div style={{ fontSize: 14, color: "var(--text-sec)" }}>Loading...</div>
         </div>
       </div>
     );

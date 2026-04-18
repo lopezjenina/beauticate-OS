@@ -4,7 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Beauticate OS",
+  title: "BEAUTICATE.",
   description: "Agency operating system — www.beauticate.com",
 };
 

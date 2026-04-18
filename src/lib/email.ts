@@ -1,6 +1,16 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize to avoid throwing during build/prerendering when
+// the RESEND_API_KEY env var is only available at runtime on the server.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new Error('RESEND_API_KEY is not configured.');
+    _resend = new Resend(key);
+  }
+  return _resend;
+}
 
 export async function sendEmail({
   to,
@@ -14,6 +24,7 @@ export async function sendEmail({
   from?: string;
 }) {
   try {
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from,
       to,

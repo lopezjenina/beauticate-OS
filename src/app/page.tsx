@@ -27,7 +27,7 @@ import {
   upsertClient, upsertVideo, upsertLead, upsertOnboarding, upsertAd,
   deleteOnboarding, deleteVideo, logActivityToDb,
 } from "@/lib/db";
-import { isAdmin, isSuperAdmin, getCurrentUser, signOut as supabaseSignOut, onAuthStateChange } from "@/lib/auth";
+import { isAdmin, isSuperAdmin, signOut as supabaseSignOut, onAuthStateChange } from "@/lib/auth";
 import { ToastContainer, CelebrationModal, showToast } from "@/components/ui";
 import type { AppUser } from "@/lib/auth";
 import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/types";
@@ -37,54 +37,16 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const [mounted, setMounted] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState<{ error: string; description: string; errorCode?: string } | null>(null);
 
   /* ─── Supabase Auth: restore session on mount ─── */
   useEffect(() => {
     let ignore = false;
 
-    // Check for error in hash (Supabase auth redirects)
-    const hash = window.location.hash;
-    if (hash && (hash.includes("error=") || hash.includes("error_description="))) {
-      try {
-        // Handle the case where Supabase uses # instead of ?
-        const params = new URLSearchParams(hash.replace("#", "?"));
-        const error = params.get("error");
-        const description = params.get("error_description");
-        const errorCode = params.get("error_code");
-        if (error || description) {
-          setAuthError({ 
-            error: error || "Authentication Error", 
-            description: description || "An error occurred during authentication.",
-            errorCode: errorCode || undefined
-          });
-          setAuthLoading(false);
-          setMounted(true);
-          return;
-        }
-      } catch (e) {
-        console.error("Error parsing auth hash:", e);
-      }
-    }
-
-    // Check for existing session
-    getCurrentUser()
-      .then((appUser) => {
-        if (ignore) return;
-        if (appUser) {
-          setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
-        }
-      })
-      .catch((err) => {
-        console.error("Auth initialization error:", err);
-      })
-      .finally(() => {
-        if (ignore) return;
-        setAuthLoading(false);
-        setMounted(true);
-      });
-
-    // Listen for auth state changes (sign-in, sign-out, token refresh)
+    // onAuthStateChange handles EVERYTHING:
+    // - INITIAL_SESSION: fires on page load (handles existing sessions AND #access_token hash)
+    // - SIGNED_IN: fires when magic link hash is processed by detectSessionInUrl
+    // - SIGNED_OUT / TOKEN_REFRESHED / USER_UPDATED: handled in auth.ts
+    // No need for a separate getCurrentUser() call — that races with hash processing.
     const unsubscribe = onAuthStateChange((appUser) => {
       if (ignore) return;
       if (appUser) {
@@ -92,6 +54,9 @@ export default function App() {
       } else {
         setUser(null);
       }
+      // Mark auth as resolved on the first event (INITIAL_SESSION always fires)
+      setAuthLoading(false);
+      setMounted(true);
     });
 
     return () => {
@@ -234,21 +199,6 @@ export default function App() {
           <div style={{ fontSize: 14, color: "#6B6B6B" }}>Loading...</div>
         </div>
       </div>
-    );
-  }
-
-  // Show auth error page if present
-  if (authError) {
-    return (
-      <AuthErrorPage 
-        error={authError.error} 
-        errorDescription={authError.description}
-        errorCode={authError.errorCode}
-        onBackToLogin={() => {
-          setAuthError(null);
-          window.location.hash = "";
-        }} 
-      />
     );
   }
 

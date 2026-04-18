@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { signInWithEmail } from "@/lib/auth";
+import { signInWithMagicLink } from "@/lib/auth";
 
 export function LoginPage({
   onLogin,
@@ -9,43 +9,46 @@ export function LoginPage({
   onLogin: (user: { name: string; email: string; role: string }) => void;
 }) {
   const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+
+  // Suppress eslint; onLogin is kept for backwards compat (auth state listener will call it)
+  void onLogin;
 
   // Timer for cooldown
   React.useEffect(() => {
     if (cooldown > 0) {
-      const timer = setInterval(() => setCooldown(prev => prev - 1), 1000);
+      const timer = setInterval(() => setCooldown((prev) => prev - 1), 1000);
       return () => clearInterval(timer);
     }
   }, [cooldown]);
 
-  const handleLogin = async () => {
-    if (!email || !pass) {
-      setError("Please enter your credentials.");
+  const handleSendLink = async () => {
+    if (!email) {
+      setError("Please enter your email address.");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const { user, error: authError } = await signInWithEmail(email, pass);
+    const { error: authError } = await signInWithMagicLink(email);
 
-    if (authError || !user) {
-      if (authError?.toLowerCase().includes("rate limit") || authError?.toLowerCase().includes("too many")) {
+    if (authError) {
+      if (authError.toLowerCase().includes("rate limit") || authError.toLowerCase().includes("too many")) {
         setError("Too many attempts. Please wait 60 seconds.");
         setCooldown(60);
       } else {
-        setError(authError || "Sign in failed. Please try again.");
+        setError(authError || "Failed to send magic link. Please try again.");
       }
       setLoading(false);
       return;
     }
 
-    onLogin({ name: user.username, email: user.email, role: user.role });
+    setSent(true);
     setLoading(false);
   };
 
@@ -95,79 +98,123 @@ export function LoginPage({
           boxShadow: "0 24px 64px rgba(0,0,0,0.1)",
         }}
       >
+        {/* Logo + Title */}
         <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 16,
-            background: "linear-gradient(135deg, var(--accent), #5AC8FA)",
-            color: "#FFF", fontSize: 24, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 20px", boxShadow: "0 12px 24px rgba(0, 122, 255, 0.3)"
-          }}>
-            B
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>Beauticate OS</h1>
-          <p style={{ fontSize: 15, color: "var(--text-sec)", margin: 0, fontWeight: 500 }}>Agency Operating System</p>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sec)", marginLeft: 4 }}>Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onFocus={() => setFocusedField("email")}
-              onBlur={() => setFocusedField(null)}
-              placeholder="you@beauticate.com"
-              style={inputStyle("email")}
-              disabled={loading}
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sec)", marginLeft: 4 }}>Password</label>
-            <input
-              type="password"
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !loading && handleLogin()}
-              onFocus={() => setFocusedField("password")}
-              onBlur={() => setFocusedField(null)}
-              placeholder="••••••••"
-              style={inputStyle("password")}
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="glass-dark" style={{
-              fontSize: 13, color: "var(--red)",
-              background: "rgba(255, 59, 48, 0.05)",
-              padding: "12px 16px", borderRadius: 12,
-              border: "1px solid rgba(255, 59, 48, 0.1)",
-              fontWeight: 500
-            }}>
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleLogin}
-            disabled={loading || cooldown > 0}
+          <div
             style={{
-              width: "100%", padding: "16px", borderRadius: 16,
-              border: "none",
-              background: (loading || cooldown > 0) ? "var(--text-ter)" : "var(--accent)",
-              color: "#FFFFFF", fontSize: 16, fontWeight: 600,
-              cursor: (loading || cooldown > 0) ? "not-allowed" : "pointer",
-              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-              boxShadow: "0 8px 20px rgba(0, 122, 255, 0.25)",
-              marginTop: 8
+              width: 64, height: 64, borderRadius: 16,
+              background: "linear-gradient(135deg, var(--accent), #5AC8FA)",
+              color: "#FFF", fontSize: 24, fontWeight: 700,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 20px", boxShadow: "0 12px 24px rgba(0, 122, 255, 0.3)",
             }}
           >
-            {loading ? "Signing in..." : cooldown > 0 ? `Wait ${cooldown}s` : "Sign In"}
-          </button>
+            B
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+            Beauticate OS
+          </h1>
+          <p style={{ fontSize: 15, color: "var(--text-sec)", margin: 0, fontWeight: 500 }}>
+            Agency Operating System
+          </p>
         </div>
+
+        {sent ? (
+          // ── Sent state ──────────────────────────────────────
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
+            <div
+              style={{
+                width: 56, height: 56, borderRadius: "50%",
+                background: "rgba(52, 199, 89, 0.1)",
+                border: "1px solid rgba(52, 199, 89, 0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 24,
+              }}
+            >
+              ✉️
+            </div>
+            <div>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>
+                Check your inbox
+              </p>
+              <p style={{ fontSize: 14, color: "var(--text-sec)", margin: 0, lineHeight: 1.6 }}>
+                We sent a secure sign-in link to{" "}
+                <strong style={{ color: "var(--text)" }}>{email}</strong>.
+                <br />
+                The link expires in 10 minutes.
+              </p>
+            </div>
+            <button
+              onClick={() => { setSent(false); setEmail(""); }}
+              style={{
+                background: "transparent", border: "none",
+                color: "var(--accent)", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", padding: "4px 8px",
+              }}
+            >
+              Use a different email
+            </button>
+          </div>
+        ) : (
+          // ── Input state ──────────────────────────────────────
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sec)", marginLeft: 4 }}>
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="login-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
+                onKeyDown={(e) => e.key === "Enter" && !loading && handleSendLink()}
+                placeholder="you@beauticate.com"
+                style={inputStyle("email")}
+                disabled={loading}
+                autoComplete="email"
+              />
+            </div>
+
+            {error && (
+              <div
+                className="glass-dark"
+                style={{
+                  fontSize: 13, color: "var(--red)",
+                  background: "rgba(255, 59, 48, 0.05)",
+                  padding: "12px 16px", borderRadius: 12,
+                  border: "1px solid rgba(255, 59, 48, 0.1)",
+                  fontWeight: 500,
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              id="login-submit"
+              onClick={handleSendLink}
+              disabled={loading || cooldown > 0}
+              style={{
+                width: "100%", padding: "16px", borderRadius: 16,
+                border: "none",
+                background: (loading || cooldown > 0) ? "var(--text-ter)" : "var(--accent)",
+                color: "#FFFFFF", fontSize: 16, fontWeight: 600,
+                cursor: (loading || cooldown > 0) ? "not-allowed" : "pointer",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                boxShadow: "0 8px 20px rgba(0, 122, 255, 0.25)",
+                marginTop: 8,
+              }}
+            >
+              {loading ? "Sending..." : cooldown > 0 ? `Wait ${cooldown}s` : "Send Magic Link →"}
+            </button>
+
+            <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-ter)", margin: 0, lineHeight: 1.5 }}>
+              🔒 No password needed. We'll send a secure link to your inbox.
+            </p>
+          </div>
+        )}
 
         <div style={{ textAlign: "center", fontSize: 13, color: "var(--text-ter)", fontWeight: 500 }}>
           Powered by Beauticate

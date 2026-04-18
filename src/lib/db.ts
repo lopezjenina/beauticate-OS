@@ -11,6 +11,8 @@ import {
 } from "./types";
 import { AppUser } from "./auth";
 import { ActivityEntry } from "./activityLog";
+import { sendEmail } from "./email";
+import { videoApprovalTemplate, assignmentTemplate, welcomeTemplate } from "./email-templates";
 
 /* ─── Key-case helpers ─── */
 
@@ -114,14 +116,36 @@ export async function fetchVideos(): Promise<Video[]> {
   } catch (err) { console.error("fetchVideos exception:", err); return []; }
 }
 
-export async function upsertVideo(video: Video): Promise<void> {
+export async function upsertVideo(video: Video, prevStatus?: string): Promise<void> {
   try {
     const row = videoToRow(video);
     const { error } = await supabase.from("videos").upsert(row, { onConflict: "id" });
     if (error) {
       console.error("upsertVideo error:", error);
-    } else if (video.attachments && video.attachments.length > 0) {
-      await saveAttachments(video.attachments, { videoId: video.id });
+    } else {
+      if (video.attachments && video.attachments.length > 0) {
+        await saveAttachments(video.attachments, { videoId: video.id });
+      }
+      // Notify client when video is delivered for review
+      if (video.editingStatus === "delivered" && prevStatus !== "delivered") {
+        // Fetch client email from clients table
+        const { data: clientRow } = await supabase
+          .from("clients")
+          .select("contact_email, name")
+          .eq("id", video.clientId)
+          .single();
+        if (clientRow?.contact_email) {
+          sendEmail({
+            to: clientRow.contact_email,
+            subject: `Your video is ready for review: ${video.title}`,
+            html: videoApprovalTemplate(
+              clientRow.name,
+              video.title,
+              "https://beauticate.space"
+            ),
+          }).catch((e) => console.error("Video approval email failed:", e));
+        }
+      }
     }
   } catch (err) { console.error("upsertVideo exception:", err); }
 }
@@ -160,16 +184,29 @@ export async function fetchLeads(): Promise<Lead[]> {
   } catch (err) { console.error("fetchLeads exception:", err); return []; }
 }
 
-export async function upsertLead(lead: Lead): Promise<void> {
+export async function upsertLead(lead: Lead, isNew = false): Promise<void> {
   try {
     const { attachments, ...leadData } = lead;
     const row = toSnakeCase(leadData as unknown as Record<string, unknown>);
-    console.log("Upserting lead row:", row);
     const { error } = await supabase.from("leads").upsert(row, { onConflict: "id" });
     if (error) {
       console.error("upsertLead error object:", JSON.stringify(error, null, 2));
-    } else if (attachments && attachments.length > 0) {
-      await saveAttachments(attachments, { leadId: lead.id });
+    } else {
+      if (attachments && attachments.length > 0) {
+        await saveAttachments(attachments, { leadId: lead.id });
+      }
+      // Notify the team when a new lead is captured
+      if (isNew && lead.email) {
+        sendEmail({
+          to: "support@beauticate.space",
+          subject: `🎯 New Lead: ${lead.contactName} — ${lead.company}`,
+          html: assignmentTemplate(
+            "Beauticate Team",
+            `${lead.contactName} (${lead.company})`,
+            "https://beauticate.space"
+          ),
+        }).catch((e) => console.error("Lead notification email failed:", e));
+      }
     }
   } catch (err) {
     console.error("upsertLead exception:", err);
@@ -233,7 +270,19 @@ export async function upsertOnboarding(client: OnboardingClient): Promise<void> 
   try {
     const row = onboardingToRow(client);
     const { error } = await supabase.from("onboarding").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertOnboarding error:", error);
+    if (error) {
+      console.error("upsertOnboarding error:", error);
+    } else {
+      // Send welcome email when ALL onboarding steps are complete
+      const allDone = Object.values(client.steps).every(Boolean);
+      if (allDone && client.contactEmail) {
+        sendEmail({
+          to: client.contactEmail,
+          subject: `Welcome to Beauticate, ${client.name}! 🎉`,
+          html: welcomeTemplate(client.contactPerson || client.name, "https://beauticate.space"),
+        }).catch((e) => console.error("Welcome email failed:", e));
+      }
+    }
   } catch (err) { console.error("upsertOnboarding exception:", err); }
 }
 

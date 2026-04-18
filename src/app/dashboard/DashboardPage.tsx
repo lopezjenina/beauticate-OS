@@ -25,11 +25,8 @@ const ACCENT_ORANGE = "#F59E0B";
 const ACCENT_RED = "#EF4444";
 
 const cardStyle: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "1px solid var(--border)",
   borderRadius: 24,
   padding: 32,
-  boxShadow: "0 10px 40px -10px rgba(0,0,0,0.04)",
   transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
 };
 
@@ -391,7 +388,7 @@ export default function DashboardPage({
       {/* ═══════════════ 2. Top Stats Row ═══════════════ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: sectionGap, marginBottom: sectionGap }}>
         {/* Active Clients */}
-        <div style={{ ...cardStyle, borderTop: `4px solid ${PRIMARY}`, padding: "20px 24px 24px" }}>
+        <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${PRIMARY}`, padding: "20px 24px 24px" }}>
           <div style={statLabel}>Active Clients</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <div style={statValue}>{activeClients}</div>
@@ -404,13 +401,13 @@ export default function DashboardPage({
         </div>
 
         {/* Monthly Revenue */}
-        <div style={{ ...cardStyle, borderTop: `4px solid ${SECONDARY}`, padding: "20px 24px 24px" }}>
+        <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${SECONDARY}`, padding: "20px 24px 24px" }}>
           <div style={statLabel}>Monthly Revenue</div>
           <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(monthlyRevenue)}</div>
         </div>
 
         {/* Videos This Week */}
-        <div style={{ ...cardStyle, borderTop: `4px solid ${LIGHT}`, padding: "20px 24px 24px" }}>
+        <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${LIGHT}`, padding: "20px 24px 24px" }}>
           <div style={statLabel}>Videos This Week</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
             <div style={statValue}>{videosThisWeek}</div>
@@ -439,7 +436,7 @@ export default function DashboardPage({
         </div>
 
         {/* Ad Spend */}
-        <div style={{ ...cardStyle, borderTop: `4px solid ${ACCENT_ORANGE}`, padding: "20px 24px 24px" }}>
+        <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${ACCENT_ORANGE}`, padding: "20px 24px 24px" }}>
           <div style={statLabel}>Ad Spend</div>
           <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(totalAdSpend)}</div>
           <div style={{ fontSize: 11, color: "#6B6B6B", marginTop: 4 }}>{activeAds} active campaigns</div>
@@ -449,7 +446,7 @@ export default function DashboardPage({
       {/* ═══════════════ 3. Charts Row ═══════════════ */}
       <div style={{ display: "grid", gridTemplateColumns: "3fr 2fr", gap: sectionGap, marginBottom: sectionGap }}>
         {/* Content Pipeline Bar Chart */}
-        <div style={cardStyle}>
+        <div className="glass" style={cardStyle}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 20 }}>
             Content Pipeline
           </div>
@@ -473,7 +470,7 @@ export default function DashboardPage({
         </div>
 
         {/* Pipeline Health */}
-        <div style={cardStyle}>
+        <div className="glass" style={cardStyle}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 20 }}>
             Pipeline Health
           </div>
@@ -526,7 +523,7 @@ export default function DashboardPage({
           { label: "Annual Run Rate", value: fmtCurrency(annualRunRate) },
           { label: "Avg Revenue / Client", value: fmtCurrency(avgRevenuePerClient) },
         ].map((item) => (
-          <div key={item.label} style={cardStyle}>
+          <div key={item.label} className="glass" style={cardStyle}>
             <div style={statLabel}>{item.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginTop: 8, letterSpacing: "-0.02em" }}>{item.value}</div>
           </div>
@@ -534,7 +531,7 @@ export default function DashboardPage({
       </div>
 
       {/* ═══════════════ 5. Team Performance ═══════════════ */}
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden", marginBottom: sectionGap }}>
+      <div className="glass" style={{ ...cardStyle, padding: 0, overflow: "hidden", marginBottom: sectionGap }}>
         <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
           Team Performance
         </div>
@@ -587,7 +584,7 @@ export default function DashboardPage({
       </div>
 
       {/* ═══════════════ 6. Bottleneck Alerts ═══════════════ */}
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+      <div className="glass" style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
           Bottleneck Alerts
         </div>

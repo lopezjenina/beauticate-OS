@@ -247,25 +247,26 @@ export default function ProductionPage({
           return (
             <div
               key={group.week}
+              className="glass"
               style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E3E3E0',
-                borderRadius: '8px',
+                borderRadius: '24px',
                 overflow: 'hidden',
+                marginBottom: '16px',
               }}
             >
               {/* Week Header */}
               <div
                 onClick={() => toggleWeekExpanded(group.week)}
                 style={{
-                  padding: '16px 24px',
+                  padding: '20px 24px',
                   cursor: 'pointer',
-                  backgroundColor: '#F7F7F5',
-                  borderBottom: isExpanded ? '1px solid #E3E3E0' : 'none',
+                  background: isExpanded ? 'rgba(0, 122, 255, 0.05)' : 'transparent',
+                  borderBottom: isExpanded ? '1px solid var(--border-light)' : 'none',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   userSelect: 'none',
+                  transition: 'background 0.2s',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -330,133 +331,133 @@ export default function ProductionPage({
                     }}
                   >
                     <thead>
-                      <tr style={{ backgroundColor: '#F7F7F5', borderBottom: '1px solid #E3E3E0' }}>
+                      <tr style={{ background: "rgba(0,0,0,0.02)", borderBottom: '1px solid var(--border-light)' }}>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
                           Client / Video
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          Monthly Revenue
+                          Revenue
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          Assigned Editor
+                          Editor
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          Shoot Date
+                          Shoot
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          Footage Uploaded
+                          Footage
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'left',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
-                          Editing Status
+                          Status
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'center',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
                           Ready
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'center',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
                           Guido
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'center',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
                           Posted
                         </th>
                         <th
                           style={{
-                            padding: '12px 24px',
+                            padding: '16px 24px',
                             textAlign: 'center',
-                            fontWeight: '600',
-                            color: '#1A1A1A',
-                            fontSize: '12px',
+                            fontWeight: '700',
+                            color: 'var(--text-sec)',
+                            fontSize: '11px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
+                            letterSpacing: '0.04em',
                           }}
                         >
                           Rev.
@@ -464,13 +465,13 @@ export default function ProductionPage({
                         {canDelete && (
                           <th
                             style={{
-                              padding: '12px 24px',
+                              padding: '16px 24px',
                               textAlign: 'center',
-                              fontWeight: '600',
-                              color: '#1A1A1A',
-                              fontSize: '12px',
+                              fontWeight: '700',
+                              color: 'var(--text-sec)',
+                              fontSize: '11px',
                               textTransform: 'uppercase',
-                              letterSpacing: '0.5px',
+                              letterSpacing: '0.04em',
                             }}
                           >
                             Delete
@@ -491,8 +492,9 @@ export default function ProductionPage({
                             <React.Fragment key={video.id}>
                             <tr
                               style={{
-                                borderBottom: '1px solid #E3E3E0',
-                                backgroundColor: isRowExpanded ? '#F0F0EE' : (cIdx + vIdx) % 2 === 0 ? '#FFFFFF' : '#F7F7F5',
+                                borderBottom: '1px solid var(--border-light)',
+                                backgroundColor: isRowExpanded ? 'rgba(0, 122, 255, 0.05)' : 'transparent',
+                                transition: 'background 0.2s',
                               }}
                             >
                               {/* Client / Video Name */}

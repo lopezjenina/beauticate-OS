@@ -20,21 +20,23 @@ export function Avatar({ initials, size = 28 }: { initials: string; size?: numbe
 
 /* ─── Badge ─── */
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
-  default: { bg: "var(--bg-sub)", color: "var(--text-sec)", border: "var(--border-light)" },
-  active: { bg: "var(--accent-light)", color: "var(--accent)", border: "transparent" },
-  success: { bg: "var(--green-light)", color: "var(--green)", border: "transparent" },
-  warning: { bg: "var(--orange-light)", color: "var(--orange)", border: "transparent" },
-  danger: { bg: "var(--red-light)", color: "var(--red)", border: "transparent" },
+  default: { bg: "rgba(0, 0, 0, 0.05)", color: "var(--text-sec)", border: "transparent" },
+  active: { bg: "rgba(0, 122, 255, 0.1)", color: "var(--accent)", border: "transparent" },
+  success: { bg: "rgba(52, 199, 89, 0.1)", color: "var(--green)", border: "transparent" },
+  warning: { bg: "rgba(255, 149, 0, 0.1)", color: "var(--orange)", border: "transparent" },
+  danger: { bg: "rgba(255, 59, 48, 0.1)", color: "var(--red)", border: "transparent" },
 };
 
 export function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: string }) {
   const s = badgeStyles[variant] || badgeStyles.default;
   return (
     <span
+      className="glass-dark"
       style={{
-        padding: "2px 8px", borderRadius: 4,
+        padding: "3px 10px", borderRadius: 8,
         background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-        fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
+        fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+        textTransform: "uppercase", letterSpacing: "0.02em"
       }}
     >
       {children}
@@ -50,23 +52,38 @@ export function Btn({
   onClick?: (e?: React.MouseEvent) => void; disabled?: boolean; style?: React.CSSProperties;
 }) {
   const base: React.CSSProperties = {
-    padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500,
-    cursor: disabled ? "default" : "pointer", transition: "background 0.1s",
+    padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+    cursor: disabled ? "default" : "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
     border: "none", opacity: disabled ? 0.4 : 1, ...sx,
+    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
   };
-  if (variant === "primary") return <button onClick={onClick} disabled={disabled} style={{ ...base, background: "var(--text)", color: "#FFF" }}>{children}</button>;
+  if (variant === "primary") return <button onClick={onClick} disabled={disabled} style={{ ...base, background: "var(--accent)", color: "#FFF", boxShadow: "0 4px 12px rgba(0, 122, 255, 0.2)" }}>{children}</button>;
   if (variant === "ghost") return <button onClick={onClick} disabled={disabled} style={{ ...base, background: "transparent", color: "var(--text-sec)" }}>{children}</button>;
-  return <button onClick={onClick} disabled={disabled} style={{ ...base, background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)" }}>{children}</button>;
+  return <button className="glass" onClick={onClick} disabled={disabled} style={{ ...base, color: "var(--text)", border: "1px solid var(--border-light)" }}>{children}</button>;
+}
+
+/* ─── Card ─── */
+export function Card({ children, style: sx, className }: { children: React.ReactNode; style?: React.CSSProperties; className?: string }) {
+  return (
+    <div 
+      className={`glass ${className || ""}`}
+      style={{
+        borderRadius: 24, padding: 32, ...sx
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /* ─── Stat Card ─── */
 export function Stat({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div style={{ padding: "20px 0" }}>
-      <div style={{ fontSize: 12, color: "var(--text-ter)", fontWeight: 500, letterSpacing: "0.02em", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: "var(--text-ter)", marginTop: 6 }}>{sub}</div>}
-    </div>
+    <Card style={{ padding: "24px 28px" }}>
+      <div style={{ fontSize: 11, color: "var(--text-ter)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text)", letterSpacing: "-0.04em", lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: "var(--text-ter)", marginTop: 8, fontWeight: 500 }}>{sub}</div>}
+    </Card>
   );
 }
 
@@ -161,26 +178,30 @@ export function ConfirmModal({
     <div
       style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center",
+        background: "rgba(0,0,0,0.2)", backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        display: "flex", alignItems: "center",
         justifyContent: "center", zIndex: 1100,
       }}
       onClick={onCancel}
     >
       <div
+        className="glass"
         style={{
-          background: "#FFF", borderRadius: 8, border: "1px solid var(--border)",
+          borderRadius: 24, border: "1px solid var(--border-light)",
           padding: "32px", maxWidth: 400, width: "90%", textAlign: "center",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.15)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 18, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>{title}</div>
-        <div style={{ fontSize: 14, color: "var(--text-sec)", marginBottom: 24, lineHeight: 1.5 }}>{message}</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 12, letterSpacing: "-0.02em" }}>{title}</div>
+        <div style={{ fontSize: 15, color: "var(--text-sec)", marginBottom: 32, lineHeight: 1.5 }}>{message}</div>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Btn onClick={onCancel}>Cancel</Btn>
+          <Btn onClick={onCancel} variant="ghost">Cancel</Btn>
           <Btn
             variant="primary"
             onClick={onConfirm}
-            style={variant === "danger" ? { background: "var(--red)", color: "#FFF" } : undefined}
+            style={variant === "danger" ? { background: "var(--red)", color: "#FFF", boxShadow: "0 4px 12px rgba(255, 59, 48, 0.2)" } : undefined}
           >
             {confirmLabel}
           </Btn>

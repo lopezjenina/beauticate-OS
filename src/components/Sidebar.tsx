@@ -93,21 +93,23 @@ export function Sidebar({
     : finalNav;
 
   return (
-    <div style={{
-      width: collapsed ? 88 : 280,
-      background: "var(--bg-sub)",
-      borderRight: "1px solid var(--border)",
-      padding: collapsed ? "24px 12px" : "32px 24px",
-      display: "flex",
-      flexDirection: "column",
-      flexShrink: 0,
-      height: "100vh",
-      position: "sticky",
-      top: 0,
-      transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-      overflow: "hidden",
-      boxShadow: "4px 0 24px rgba(0,0,0,0.02)",
-    }}>
+    <div 
+      className="glass"
+      style={{
+        width: collapsed ? 88 : 280,
+        borderRight: "1px solid var(--border)",
+        padding: collapsed ? "24px 12px" : "32px 20px",
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+        height: "100vh",
+        position: "sticky",
+        top: 0,
+        transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        overflow: "hidden",
+        zIndex: 100,
+      }}
+    >
       {/* Branding */}
       <div style={{ padding: collapsed ? "4px 0" : "4px 10px", marginBottom: 32, textAlign: collapsed ? "center" : "left", display: "flex", alignItems: "center", gap: 12 }}>
         {collapsed ? (
@@ -122,15 +124,15 @@ export function Sidebar({
           <>
             <div style={{
               fontSize: 14, fontWeight: 700, width: 40, height: 40, borderRadius: 12,
-              background: "linear-gradient(135deg, var(--accent), #818CF8)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)"
+              background: "linear-gradient(135deg, var(--accent), #5AC8FA)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, boxShadow: "0 8px 16px rgba(0, 122, 255, 0.2)"
             }}>
               {getInitials(userName)}
             </div>
             <div style={{ overflow: "hidden" }}>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--text)" }}>Beauticate</div>
-              <div style={{ fontSize: 13, color: "var(--text-sec)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
-                {userName}{userRole ? ` | ${userRole}` : ""}
+              <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text)" }}>Beauticate</div>
+              <div style={{ fontSize: 13, color: "var(--text-ter)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
+                {userName}
               </div>
             </div>
           </>
@@ -139,13 +141,13 @@ export function Sidebar({
 
       {/* Global Search */}
       {!collapsed && (
-        <div style={{ padding: "0 4px", marginBottom: 12 }}>
+        <div style={{ padding: "0 4px", marginBottom: 20 }}>
           <GlobalSearch clients={clients} videos={videos} leads={leads} ads={ads} onNavigate={onNavigate} />
         </div>
       )}
 
       {/* Nav items */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -154,19 +156,21 @@ export function Sidebar({
             style={{
               width: "100%",
               textAlign: "left",
-              padding: collapsed ? "12px 0" : "12px 16px",
-              borderRadius: 12,
+              padding: collapsed ? "12px 0" : "10px 14px",
+              borderRadius: 10,
               border: "none",
-              background: currentPage === item.id ? "var(--accent-light)" : "transparent",
+              background: currentPage === item.id ? "var(--bg-glass)" : "transparent",
               color: currentPage === item.id ? "var(--accent)" : "var(--text-sec)",
               cursor: "pointer",
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: currentPage === item.id ? 600 : 500,
               transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               display: "flex",
               justifyContent: collapsed ? "center" : "flex-start",
               alignItems: "center",
               gap: 12,
+              boxShadow: currentPage === item.id ? "0 4px 12px rgba(0,0,0,0.05)" : "none",
+              border: currentPage === item.id ? "1px solid var(--border-light)" : "1px solid transparent",
             }}
           >
             {ICONS[item.id] && <NavIcon path={ICONS[item.id]} />}

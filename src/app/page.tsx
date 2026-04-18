@@ -17,6 +17,23 @@ import CalendarPage from "./calendar/CalendarPage";
 import ActivityPage from "./activity/ActivityPage";
 import ClientsPage from "./clients/ClientsPage";
 import PackagesPage from "./packages/PackagesPage";
+import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
+
+export default async function Page() {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data: todos } = await supabase.from('todos').select()
+
+  return (
+    <ul>
+      {todos?.map((todo) => (
+        <li key={todo.id}>{todo.name}</li>
+      ))}
+    </ul>
+  )
+}
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, EDITORS,
 } from "@/lib/store";

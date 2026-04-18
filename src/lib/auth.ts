@@ -71,14 +71,13 @@ export function onAuthStateChange(
 ): () => void {
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (event, session) => {
+  } = supabase.auth.onAuthStateChange((event, session) => {
     // INITIAL_SESSION: fires on page load. If no session, user is logged out.
     if (event === "INITIAL_SESSION") {
       if (!session?.user) {
         callback(null);
       } else {
-        const appUser = await getOrCreateProfile(session.user.id, session.user.email ?? "");
-        callback(appUser);
+        getOrCreateProfile(session.user.id, session.user.email ?? "").then(appUser => callback(appUser));
       }
       return;
     }
@@ -89,8 +88,7 @@ export function onAuthStateChange(
         callback(null);
         return;
       }
-      const appUser = await getOrCreateProfile(session.user.id, session.user.email ?? "");
-      callback(appUser);
+      getOrCreateProfile(session.user.id, session.user.email ?? "").then(appUser => callback(appUser));
       return;
     }
 

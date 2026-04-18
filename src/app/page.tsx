@@ -42,14 +42,21 @@ export default function App() {
     let ignore = false;
 
     // Check for existing session
-    getCurrentUser().then((appUser) => {
-      if (ignore) return;
-      if (appUser) {
-        setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
-      }
-      setAuthLoading(false);
-      setMounted(true);
-    });
+    getCurrentUser()
+      .then((appUser) => {
+        if (ignore) return;
+        if (appUser) {
+          setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
+        }
+      })
+      .catch((err) => {
+        console.error("Auth initialization error:", err);
+      })
+      .finally(() => {
+        if (ignore) return;
+        setAuthLoading(false);
+        setMounted(true);
+      });
 
     // Listen for auth state changes (sign-in, sign-out, token refresh)
     const unsubscribe = onAuthStateChange((appUser) => {

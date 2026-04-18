@@ -42,13 +42,22 @@ export default function App() {
   useEffect(() => {
     let ignore = false;
 
+    // Safety timeout: if INITIAL_SESSION never fires (network issue, bad env vars),
+    // stop showing the loader after 5s and fall through to the login page.
+    const timeout = setTimeout(() => {
+      if (!ignore) {
+        setAuthLoading(false);
+        setMounted(true);
+      }
+    }, 5000);
+
     // onAuthStateChange handles EVERYTHING:
-    // - INITIAL_SESSION: fires on page load (handles existing sessions AND #access_token hash)
-    // - SIGNED_IN: fires when magic link hash is processed by detectSessionInUrl
+    // - INITIAL_SESSION: fires on page load (handles existing sessions AND /auth/callback redirect)
+    // - SIGNED_IN: fires after PKCE code exchange
     // - SIGNED_OUT / TOKEN_REFRESHED / USER_UPDATED: handled in auth.ts
-    // No need for a separate getCurrentUser() call — that races with hash processing.
     const unsubscribe = onAuthStateChange((appUser) => {
       if (ignore) return;
+      clearTimeout(timeout);
       if (appUser) {
         setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
       } else {
@@ -61,6 +70,7 @@ export default function App() {
 
     return () => {
       ignore = true;
+      clearTimeout(timeout);
       unsubscribe();
     };
   }, []);

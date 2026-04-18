@@ -34,9 +34,8 @@ export async function signInWithMagicLink(email: string): Promise<{ error: strin
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      // Redirect to root — detectSessionInUrl will handle the #access_token hash
-      // For PKCE (code-based), point to /auth/callback instead
-      emailRedirectTo: window.location.origin,
+      // PKCE flow: Supabase emails a ?code= link → /auth/callback exchanges it for a session cookie
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
   return { error: error?.message ?? null };

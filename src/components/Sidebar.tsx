@@ -158,7 +158,6 @@ export function Sidebar({
               textAlign: "left",
               padding: collapsed ? "12px 0" : "10px 14px",
               borderRadius: 10,
-              border: "none",
               background: currentPage === item.id ? "var(--bg-glass)" : "transparent",
               color: currentPage === item.id ? "var(--accent)" : "var(--text-sec)",
               cursor: "pointer",

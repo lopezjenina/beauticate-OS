@@ -17,23 +17,7 @@ import CalendarPage from "./calendar/CalendarPage";
 import ActivityPage from "./activity/ActivityPage";
 import ClientsPage from "./clients/ClientsPage";
 import PackagesPage from "./packages/PackagesPage";
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
-
-export default async function Page() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-
-  const { data: todos } = await supabase.from('todos').select()
-
-  return (
-    <ul>
-      {todos?.map((todo) => (
-        <li key={todo.id}>{todo.name}</li>
-      ))}
-    </ul>
-  )
-}
+import { AuthErrorPage } from "@/components/AuthErrorPage";
 import {
   INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ONBOARDING, INIT_ADS, EDITORS,
 } from "@/lib/store";
@@ -53,10 +37,35 @@ export default function App() {
   const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
   const [mounted, setMounted] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<{ error: string; description: string; errorCode?: string } | null>(null);
 
   /* ─── Supabase Auth: restore session on mount ─── */
   useEffect(() => {
     let ignore = false;
+
+    // Check for error in hash (Supabase auth redirects)
+    const hash = window.location.hash;
+    if (hash && (hash.includes("error=") || hash.includes("error_description="))) {
+      try {
+        // Handle the case where Supabase uses # instead of ?
+        const params = new URLSearchParams(hash.replace("#", "?"));
+        const error = params.get("error");
+        const description = params.get("error_description");
+        const errorCode = params.get("error_code");
+        if (error || description) {
+          setAuthError({ 
+            error: error || "Authentication Error", 
+            description: description || "An error occurred during authentication.",
+            errorCode: errorCode || undefined
+          });
+          setAuthLoading(false);
+          setMounted(true);
+          return;
+        }
+      } catch (e) {
+        console.error("Error parsing auth hash:", e);
+      }
+    }
 
     // Check for existing session
     getCurrentUser()
@@ -225,6 +234,21 @@ export default function App() {
           <div style={{ fontSize: 14, color: "#6B6B6B" }}>Loading...</div>
         </div>
       </div>
+    );
+  }
+
+  // Show auth error page if present
+  if (authError) {
+    return (
+      <AuthErrorPage 
+        error={authError.error} 
+        errorDescription={authError.description}
+        errorCode={authError.errorCode}
+        onBackToLogin={() => {
+          setAuthError(null);
+          window.location.hash = "";
+        }} 
+      />
     );
   }
 

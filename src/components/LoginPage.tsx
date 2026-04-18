@@ -13,7 +13,15 @@ export function LoginPage({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [hoverButton, setHoverButton] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // Timer for cooldown
+  React.useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setInterval(() => setCooldown(prev => prev - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [cooldown]);
 
   const handleLogin = async () => {
     if (!email || !pass) {
@@ -27,7 +35,12 @@ export function LoginPage({
     const { user, error: authError } = await signInWithEmail(email, pass);
 
     if (authError || !user) {
-      setError(authError || "Sign in failed. Please try again.");
+      if (authError?.toLowerCase().includes("rate limit") || authError?.toLowerCase().includes("too many")) {
+        setError("Too many attempts. Please wait 60 seconds.");
+        setCooldown(60);
+      } else {
+        setError(authError || "Sign in failed. Please try again.");
+      }
       setLoading(false);
       return;
     }
@@ -140,19 +153,19 @@ export function LoginPage({
 
           <button
             onClick={handleLogin}
-            disabled={loading}
+            disabled={loading || cooldown > 0}
             style={{
               width: "100%", padding: "16px", borderRadius: 16,
               border: "none",
-              background: loading ? "var(--text-ter)" : "var(--accent)",
+              background: (loading || cooldown > 0) ? "var(--text-ter)" : "var(--accent)",
               color: "#FFFFFF", fontSize: 16, fontWeight: 600,
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: (loading || cooldown > 0) ? "not-allowed" : "pointer",
               transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               boxShadow: "0 8px 20px rgba(0, 122, 255, 0.25)",
               marginTop: 8
             }}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in..." : cooldown > 0 ? `Wait ${cooldown}s` : "Sign In"}
           </button>
         </div>
 

@@ -12,7 +12,8 @@ interface AuthErrorPageProps {
 export function AuthErrorPage({ error, errorDescription, errorCode, onBackToLogin }: AuthErrorPageProps) {
   // Map Supabase error codes to more user-friendly messages if needed
   const isExpired = errorCode === "otp_expired" || errorDescription.toLowerCase().includes("expired");
-  const friendlyError = isExpired ? "Link Expired" : (error === "access_denied" ? "Access Denied" : error);
+  const isRateLimited = errorCode === "over_email_send_rate_limit" || errorDescription.toLowerCase().includes("rate limit");
+  const friendlyError = isRateLimited ? "Too Many Requests" : (isExpired ? "Link Expired" : (error === "access_denied" ? "Access Denied" : error));
   
   return (
     <div

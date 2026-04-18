@@ -24,7 +24,7 @@ export const INIT_PACKAGES: ServicePackage[] = [
 /** Read active package names from sessionStorage (or fallback to defaults) */
 export function getPackageNames(): string[] {
   if (typeof window !== "undefined") {
-    const saved = sessionStorage.getItem("agencyos_packages");
+    const saved = sessionStorage.getItem("beauticateos_packages");
     if (saved) {
       try {
         const pkgs: ServicePackage[] = JSON.parse(saved);
@@ -38,7 +38,7 @@ export function getPackageNames(): string[] {
 export default function PackagesPage() {
   const [packages, setPackages] = useState<ServicePackage[]>(() => {
     if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("agencyos_packages");
+      const saved = sessionStorage.getItem("beauticateos_packages");
       if (saved) {
         try { return JSON.parse(saved); } catch { /* fallback */ }
       }
@@ -67,7 +67,7 @@ export default function PackagesPage() {
 
   // Persist on change
   useEffect(() => {
-    sessionStorage.setItem("agencyos_packages", JSON.stringify(packages));
+    sessionStorage.setItem("beauticateos_packages", JSON.stringify(packages));
   }, [packages]);
   const [showModal, setShowModal] = useState(false);
   const [editingPkg, setEditingPkg] = useState<ServicePackage | null>(null);

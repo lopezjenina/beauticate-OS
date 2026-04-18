@@ -1,30 +1,39 @@
 "use client";
 
 import React, { useState } from "react";
-import { AppUser } from "@/lib/auth";
+import { signInWithEmail } from "@/lib/auth";
 
 export function LoginPage({
   onLogin,
-  users,
 }: {
   onLogin: (user: { name: string; email: string; role: string }) => void;
-  users: AppUser[];
 }) {
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [hoverButton, setHoverButton] = useState(false);
 
-  const handleLogin = () => {
-    const found = users.find((u) => u.username.toLowerCase() === username.toLowerCase() && u.password === pass);
-    if (found) {
-      onLogin({ name: found.username, email: found.email, role: found.role });
-    } else if (username && pass) {
-      setError("Invalid username or password.");
-    } else {
+  const handleLogin = async () => {
+    if (!email || !pass) {
       setError("Please enter your credentials.");
+      return;
     }
+
+    setLoading(true);
+    setError("");
+
+    const { user, error: authError } = await signInWithEmail(email, pass);
+
+    if (authError || !user) {
+      setError(authError || "Sign in failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    onLogin({ name: user.username, email: user.email, role: user.role });
+    setLoading(false);
   };
 
   const inputStyle = (field: string): React.CSSProperties => ({
@@ -109,7 +118,7 @@ export function LoginPage({
               lineHeight: 1.2,
             }}
           >
-            Viral Vision OS
+            Beauticate OS
           </h1>
           <p
             style={{
@@ -122,7 +131,7 @@ export function LoginPage({
             Your agency&apos;s command center
           </p>
           <a
-            href="https://www.viralvisionmk.com"
+            href="https://www.beauticate.com"
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -131,7 +140,7 @@ export function LoginPage({
               textDecoration: "none",
             }}
           >
-            www.viralvisionmk.com
+            www.beauticate.com
           </a>
 
           {/* Feature highlights */}
@@ -209,16 +218,17 @@ export function LoginPage({
                   marginBottom: 6,
                 }}
               >
-                Username
+                Email
               </label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onFocus={() => setFocusedField("username")}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setFocusedField("email")}
                 onBlur={() => setFocusedField(null)}
-                placeholder="Enter your username"
-                style={inputStyle("username")}
+                placeholder="you@example.com"
+                style={inputStyle("email")}
+                disabled={loading}
               />
             </div>
 
@@ -238,11 +248,12 @@ export function LoginPage({
                 type="password"
                 value={pass}
                 onChange={(e) => setPass(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) => e.key === "Enter" && !loading && handleLogin()}
                 onFocus={() => setFocusedField("password")}
                 onBlur={() => setFocusedField(null)}
                 placeholder="Enter your password"
                 style={inputStyle("password")}
+                disabled={loading}
               />
             </div>
 
@@ -265,21 +276,22 @@ export function LoginPage({
               onClick={handleLogin}
               onMouseEnter={() => setHoverButton(true)}
               onMouseLeave={() => setHoverButton(false)}
+              disabled={loading}
               style={{
                 width: "100%",
                 padding: "12px",
                 borderRadius: 8,
                 border: "none",
-                background: hoverButton ? "#4A4EB3" : "#5B5FC7",
+                background: loading ? "#9B9DD4" : hoverButton ? "#4A4EB3" : "#5B5FC7",
                 color: "#FFFFFF",
                 fontSize: 14,
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: loading ? "not-allowed" : "pointer",
                 marginTop: 4,
                 transition: "background 0.15s",
               }}
             >
-              Sign in
+              {loading ? "Signing in..." : "Sign in"}
             </button>
           </div>
 
@@ -291,7 +303,7 @@ export function LoginPage({
               textAlign: "center",
             }}
           >
-            Viral Vision OS
+            Beauticate OS
           </div>
         </div>
       </div>

@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Avatar, Badge, Btn, ProgressBar, Checkbox, PageHeader, EmptyState, ConfirmModal } from '@/components/ui';
 import { OnboardingClient } from '@/lib/types';
-import { TEAM } from '@/lib/store';
 import { upsertOnboarding, deleteOnboarding as deleteOnboardingDb } from '@/lib/db';
 import { getPackageNames } from '@/app/packages/PackagesPage';
 
@@ -12,8 +11,7 @@ interface OnboardingPageProps {
   setOnboardingClients: (fn: (prev: OnboardingClient[]) => OnboardingClient[]) => void;
   onMoveToProduction: (client: OnboardingClient, week: number) => void;
   canDelete?: boolean;
-  editors?: { id: string; name: string }[];
-  socialManagers?: { id: string; name: string }[];
+  users?: any[];
 }
 
 export default function OnboardingPage({
@@ -21,8 +19,7 @@ export default function OnboardingPage({
   setOnboardingClients,
   onMoveToProduction,
   canDelete = false,
-  editors: editorsProp,
-  socialManagers: smProp,
+  users = [],
 }: OnboardingPageProps) {
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [deletingClient, setDeletingClient] = useState<OnboardingClient | null>(null);
@@ -112,10 +109,8 @@ export default function OnboardingPage({
   };
 
   const getTeamMembersForRole = (role: string) => {
-    if (role === "editor" && editorsProp) return editorsProp;
-    if (role === "social_manager" && smProp) return smProp;
-    if (role === "editor") return TEAM.filter((member) => member.role === "editor" || member.role === "videographer");
-    return TEAM.filter((member) => member.role === role);
+    if (role === "editor") return users.filter((member) => member.role === "editor" || member.role === "videographer");
+    return users.filter((member) => member.role === role);
   };
 
   if (onboardingClients.length === 0) {
@@ -314,7 +309,7 @@ export default function OnboardingPage({
                                   item.id === 'editorAssigned' ? 'editor' : 'social_manager'
                                 ).map((member) => (
                                   <option key={member.id} value={member.id}>
-                                    {member.name}
+                                    {member.username}
                                   </option>
                                 ))}
                               </select>

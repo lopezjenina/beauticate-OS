@@ -28,7 +28,7 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
   const [showDropdown, setShowDropdown] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("agencyos_dismissed_notifs");
+      const saved = sessionStorage.getItem("beauticateos_dismissed_notifs");
       if (saved) {
         try { return new Set(JSON.parse(saved)); } catch { /* fallback */ }
       }
@@ -40,7 +40,7 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
-    sessionStorage.setItem("agencyos_dismissed_notifs", JSON.stringify([...dismissedIds]));
+    sessionStorage.setItem("beauticateos_dismissed_notifs", JSON.stringify([...dismissedIds]));
   }, [dismissedIds]);
 
   useEffect(() => {

@@ -61,7 +61,7 @@ function getInitials(name: string): string {
 
 export function Sidebar({
   currentPage, onNavigate, userName, userRole, approvalCount, onSignOut,
-  videos = [], leads = [], clients = [], ads = [], permissions,
+  videos = [], leads = [], clients = [], ads = [], permissions, users = [],
 }: {
   currentPage: string;
   onNavigate: (page: string) => void;
@@ -74,46 +74,64 @@ export function Sidebar({
   clients?: Client[];
   ads?: AdCampaign[];
   permissions?: Record<string, boolean>;
+  users?: any[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
+  const hasEditors = users.some(u => u.role === "editor" || u.role === "videographer");
+  
   const filteredNav = permissions
     ? NAV.filter(item => permissions[item.id] !== false)
     : NAV;
-  const navItems = isSuperAdmin(userName)
-    ? [...filteredNav, { id: "users", label: "Users", group: "admin" }]
-    : filteredNav;
+
+  const finalNav = hasEditors 
+    ? filteredNav 
+    : filteredNav.filter(item => item.id !== "editors");
+
+  const navItems = isSuperAdmin(userName, users)
+    ? [...finalNav, { id: "users", label: "Users", group: "admin" }]
+    : finalNav;
 
   return (
     <div style={{
-      width: collapsed ? 60 : 220,
+      width: collapsed ? 88 : 280,
       background: "var(--bg-sub)",
       borderRight: "1px solid var(--border)",
-      padding: collapsed ? "20px 6px" : "20px 12px",
+      padding: collapsed ? "24px 12px" : "32px 24px",
       display: "flex",
       flexDirection: "column",
       flexShrink: 0,
       height: "100vh",
       position: "sticky",
       top: 0,
-      transition: "width 0.2s ease",
+      transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       overflow: "hidden",
+      boxShadow: "4px 0 24px rgba(0,0,0,0.02)",
     }}>
       {/* Branding */}
-      <div style={{ padding: collapsed ? "4px 0" : "4px 10px", marginBottom: 16, textAlign: collapsed ? "center" : "left" }}>
+      <div style={{ padding: collapsed ? "4px 0" : "4px 10px", marginBottom: 32, textAlign: collapsed ? "center" : "left", display: "flex", alignItems: "center", gap: 12 }}>
         {collapsed ? (
           <div style={{
-            fontSize: 13, fontWeight: 700, width: 32, height: 32, borderRadius: 8,
-            background: "var(--bg-hover)", display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto",
+            fontSize: 14, fontWeight: 700, width: 40, height: 40, borderRadius: 12,
+            background: "linear-gradient(135deg, var(--accent), #818CF8)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto", boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)"
           }}>
             {getInitials(userName)}
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em" }}>Viral Vision OS</div>
-            <div style={{ fontSize: 12, color: "var(--text-ter)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {userName}{userRole ? ` | ${userRole}` : ""}
+            <div style={{
+              fontSize: 14, fontWeight: 700, width: 40, height: 40, borderRadius: 12,
+              background: "linear-gradient(135deg, var(--accent), #818CF8)", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, boxShadow: "0 4px 12px rgba(99, 102, 241, 0.3)"
+            }}>
+              {getInitials(userName)}
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--text)" }}>Beauticate</div>
+              <div style={{ fontSize: 13, color: "var(--text-sec)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
+                {userName}{userRole ? ` | ${userRole}` : ""}
+              </div>
             </div>
           </>
         )}
@@ -136,27 +154,27 @@ export function Sidebar({
             style={{
               width: "100%",
               textAlign: "left",
-              padding: collapsed ? "8px 0" : "8px 10px",
-              borderRadius: 6,
+              padding: collapsed ? "12px 0" : "12px 16px",
+              borderRadius: 12,
               border: "none",
-              background: currentPage === item.id ? "var(--bg-hover)" : "transparent",
-              color: currentPage === item.id ? "var(--text)" : "var(--text-sec)",
+              background: currentPage === item.id ? "var(--accent-light)" : "transparent",
+              color: currentPage === item.id ? "var(--accent)" : "var(--text-sec)",
               cursor: "pointer",
-              fontSize: 13,
-              fontWeight: currentPage === item.id ? 600 : 400,
-              transition: "background 0.1s",
+              fontSize: 14,
+              fontWeight: 500,
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               display: "flex",
               justifyContent: collapsed ? "center" : "flex-start",
               alignItems: "center",
-              gap: 8,
+              gap: 12,
             }}
           >
             {ICONS[item.id] && <NavIcon path={ICONS[item.id]} />}
             {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
             {!collapsed && item.id === "approvals" && approvalCount !== undefined && approvalCount > 0 && (
               <span style={{
-                fontSize: 11, fontWeight: 600, background: "var(--text)", color: "#FFF",
-                borderRadius: 10, padding: "1px 7px", minWidth: 18, textAlign: "center",
+                fontSize: 12, fontWeight: 600, background: "var(--accent)", color: "#FFF",
+                borderRadius: 12, padding: "2px 8px", minWidth: 24, textAlign: "center",
               }}>
                 {approvalCount}
               </span>

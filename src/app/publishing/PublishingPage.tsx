@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Video } from "@/lib/types";
-import { TEAM, INIT_CLIENTS } from "@/lib/store";
+import { Video, Client } from "@/lib/types";
+import { AppUser } from "@/lib/auth";
 import { PageHeader, Badge, Btn, Avatar, Stat, showToast } from "@/components/ui";
 import { logActivity } from "@/lib/activityLog";
 import { updateVideoField, upsertVideo } from "@/lib/db";
@@ -11,9 +11,11 @@ interface Props {
   videos: Video[];
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
   userName?: string;
+  clients?: Client[];
+  users?: AppUser[];
 }
 
-export default function PublishingPage({ videos, setVideos, userName }: Props) {
+export default function PublishingPage({ videos, setVideos, userName, clients = [], users = [] }: Props) {
   const today = new Date("2026-03-30");
   const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -30,13 +32,15 @@ export default function PublishingPage({ videos, setVideos, userName }: Props) {
   );
 
   const getClientName = (clientId: string) =>
-    INIT_CLIENTS.find((c) => c.id === clientId)?.name || "Unknown";
+    clients.find((c) => c.id === clientId)?.name || "Unknown";
 
   const getEditorName = (editorId: string) =>
-    TEAM.find((t) => t.id === editorId)?.name || "Unknown";
+    users.find((u) => u.id === editorId)?.username || "Unknown";
 
-  const getEditorInitials = (editorId: string) =>
-    TEAM.find((t) => t.id === editorId)?.initials || "?";
+  const getEditorInitials = (editorId: string) => {
+    const name = users.find((u) => u.id === editorId)?.username || "?";
+    return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  };
 
   const getWeekNumber = (dateStr: string): number => {
     const date = new Date(dateStr);

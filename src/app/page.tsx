@@ -26,43 +26,56 @@ import {
   upsertClient, upsertVideo, upsertLead, upsertOnboarding, upsertAd,
   deleteOnboarding, deleteVideo, logActivityToDb,
 } from "@/lib/db";
-import { INIT_USERS, isAdmin, isSuperAdmin } from "@/lib/auth";
+import { isAdmin, isSuperAdmin, getCurrentUser, signOut as supabaseSignOut, onAuthStateChange } from "@/lib/auth";
 import { ToastContainer, CelebrationModal, showToast } from "@/components/ui";
 import type { AppUser } from "@/lib/auth";
 import type { Client, Video, Lead, OnboardingClient, AdCampaign } from "@/lib/types";
 
 export default function App() {
-  const [users, setUsers] = useState<AppUser[]>(INIT_USERS);
-  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("agencyos_user");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Validate session against source-of-truth user list
-        const matched = INIT_USERS.find(u => u.username === parsed.name);
-        if (matched) return { name: matched.username, email: matched.email, role: matched.role };
-      }
-    }
-    return null;
-  });
-  React.useEffect(() => {
-    if (user) {
-      sessionStorage.setItem("agencyos_user", JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem("agencyos_user");
-    }
-  }, [user]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [user, setUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  const [page, setPage] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("agencyos_user");
-      if (saved) {
-        const u = JSON.parse(saved);
-        if (!["superadmin", "admin"].includes(u.role)) return "production";
+  /* ─── Supabase Auth: restore session on mount ─── */
+  useEffect(() => {
+    let ignore = false;
+
+    // Check for existing session
+    getCurrentUser().then((appUser) => {
+      if (ignore) return;
+      if (appUser) {
+        setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
+      }
+      setAuthLoading(false);
+      setMounted(true);
+    });
+
+    // Listen for auth state changes (sign-in, sign-out, token refresh)
+    const unsubscribe = onAuthStateChange((appUser) => {
+      if (ignore) return;
+      if (appUser) {
+        setUser({ name: appUser.username, email: appUser.email, role: appUser.role });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      ignore = true;
+      unsubscribe();
+    };
+  }, []);
+
+  const [page, setPage] = useState("dashboard");
+
+  useEffect(() => {
+    if (user) {
+      if (!["superadmin", "admin"].includes(user.role) && page === "dashboard") {
+        setPage("production");
       }
     }
-    return "dashboard";
-  });
+  }, [user, page]);
 
   /* ─── Shared State ─── */
   const [clients, setClients] = useState<Client[]>(INIT_CLIENTS);
@@ -73,8 +86,9 @@ export default function App() {
 
   const [celebration, setCelebration] = useState<{ title: string; message: string } | null>(null);
 
-  /* ─── Load data from Supabase on mount (fallback to INIT_* if empty) ─── */
+  /* ─── Load data from Supabase once authenticated ─── */
   useEffect(() => {
+    if (!user) return; // Don't fetch until signed in
     let mounted = true;
     async function loadData() {
       const [dbClients, dbVideos, dbLeads, dbOnboarding, dbAds, dbUsers] = await Promise.all([
@@ -90,13 +104,17 @@ export default function App() {
     }
     loadData();
     return () => { mounted = false; };
-  }, []);
+  }, [user]);
 
   /* ─── Admin check ─── */
-  const canDelete = user ? isAdmin(user.name) : false;
-  const isSuperAdminUser = user ? isSuperAdmin(user.name) : false;
+  const canDelete = user ? isAdmin(user.name, users) : false;
+  const isSuperAdminUser = user ? isSuperAdmin(user.name, users) : false;
 
-
+  /* ─── Sign out handler ─── */
+  const handleSignOut = useCallback(async () => {
+    await supabaseSignOut();
+    setUser(null);
+  }, []);
 
   /* ─── Gate: Sales → Onboarding ─── */
   const handleClosedWon = useCallback((lead: Lead) => {
@@ -141,13 +159,15 @@ export default function App() {
       assignedWeek = (weekCounts.indexOf(Math.min(...weekCounts)) + 1) as 1 | 2 | 3 | 4;
     }
 
+    const lead = leads.find(l => l.id === ob.leadId);
+
     const newClient: Client = {
       id: `c-${Date.now()}`,
       name: ob.name,
       initials: ob.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(),
-      monthlyRevenue: 2500,
-      assignedEditor: ob.assignedEditor || EDITORS[0].id,
-      assignedSocialManager: ob.assignedSocialManager || "sm1",
+      monthlyRevenue: lead?.estimatedRevenue || 0,
+      assignedEditor: ob.assignedEditor || users.find(u => u.role === "editor")?.id || "unassigned",
+      assignedSocialManager: ob.assignedSocialManager || users.find(u => u.role === "social_manager")?.id || "unassigned",
       week: assignedWeek,
       status: "active",
       contactPerson: ob.contactPerson,
@@ -172,7 +192,20 @@ export default function App() {
   /* ─── Derived counts ─── */
   const approvalCount = videos.filter((v) => v.editingStatus === "delivered").length;
 
-  if (!user) return <LoginPage onLogin={setUser} users={users} />;
+  // Show loading while checking auth session
+  if (!mounted || authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Beauticate OS</div>
+          <div style={{ fontSize: 14, color: "#6B6B6B" }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!user) return <LoginPage onLogin={setUser} />;
 
   const currentUserPerms = users.find(u => u.username === user.name)?.permissions;
 
@@ -183,9 +216,9 @@ export default function App() {
     }
     switch (page) {
       case "dashboard":
-        return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
+        return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} users={users} />;
       case "calendar":
-        return <CalendarPage clients={clients} videos={videos} />;
+        return <CalendarPage clients={clients} videos={videos} users={users} />;
       case "sales":
         return <SalesPage leads={leads} setLeads={setLeads} onClosedWon={handleClosedWon} canDelete={canDelete} />;
       case "onboarding":
@@ -195,18 +228,19 @@ export default function App() {
             setOnboardingClients={setOnboardingClients}
             onMoveToProduction={handleMoveToProduction}
             canDelete={canDelete}
+            users={users}
           />
         );
       case "clients":
         return <ClientsPage clients={clients} setClients={setClients} canDelete={canDelete} />;
       case "production":
-        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} />;
+        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} users={users} />;
       case "approvals":
-        return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} />;
+        return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} clients={clients} users={users} />;
       case "publishing":
-        return <PublishingPage videos={videos} setVideos={setVideos} userName={user.name} />;
+        return <PublishingPage videos={videos} setVideos={setVideos} userName={user.name} clients={clients} users={users} />;
       case "editors":
-        return <EditorsPage videos={videos} />;
+        return <EditorsPage videos={videos} users={users} />;
       case "ads":
         return <AdsPage ads={ads} setAds={setAds} clients={clients} canDelete={canDelete} />;
       case "packages":
@@ -216,28 +250,29 @@ export default function App() {
       case "activity":
         return <ActivityPage />;
       case "users":
-        return isSuperAdminUser ? <UsersPage users={users} setUsers={setUsers} /> : <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
+        return isSuperAdminUser ? <UsersPage users={users} setUsers={setUsers} /> : <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} users={users} />;
       default:
-        return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} />;
+        return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} users={users} />;
     }
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif", color: "var(--text)", background: "var(--bg)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", color: "var(--text)", background: "var(--bg)" }}>
       <Sidebar
         currentPage={page}
         onNavigate={setPage}
         userName={user.name}
         userRole={user.role}
         approvalCount={approvalCount}
-        onSignOut={() => setUser(null)}
+        onSignOut={handleSignOut}
         videos={videos}
         leads={leads}
         clients={clients}
         ads={ads}
-        permissions={users.find(u => u.username === user.name)?.permissions}
+        permissions={currentUserPerms}
+        users={users}
       />
-      <div style={{ flex: 1, padding: page === "knowledge" ? 0 : "40px 56px", overflowY: "auto", minHeight: "100vh" }}>
+      <div style={{ flex: 1, padding: page === "knowledge" ? 0 : "48px 64px", overflowY: "auto", minHeight: "100vh" }}>
         {renderPage()}
       </div>
       <ToastContainer />

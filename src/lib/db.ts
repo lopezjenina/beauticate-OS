@@ -7,6 +7,7 @@ import {
   OnboardingClient,
   AdCampaign,
   KBDoc,
+  Attachment,
 } from "./types";
 import { AppUser } from "./auth";
 import { ActivityEntry } from "./activityLog";
@@ -86,11 +87,18 @@ function videoFromRow(row: Record<string, unknown>): Video {
     try { camel.notes = JSON.parse(camel.notes as string); } catch { camel.notes = []; }
   }
   if (!Array.isArray(camel.notes)) camel.notes = [];
+
+  // Handle nested attachments
+  if (row.attachments) {
+    (camel as any).attachments = (row.attachments as any[]).map(a => toCamelCase(a) as unknown as Attachment);
+  }
+
   return camel as unknown as Video;
 }
 
 function videoToRow(video: Video): Record<string, unknown> {
-  const row = toSnakeCase(video as unknown as Record<string, unknown>);
+  const { attachments, ...videoData } = video;
+  const row = toSnakeCase(videoData as unknown as Record<string, unknown>);
   // notes array -> JSONB
   if (row.notes !== undefined) {
     row.notes = JSON.stringify(row.notes);
@@ -100,7 +108,7 @@ function videoToRow(video: Video): Record<string, unknown> {
 
 export async function fetchVideos(): Promise<Video[]> {
   try {
-    const { data, error } = await supabase.from("videos").select("*");
+    const { data, error } = await supabase.from("videos").select("*, attachments(*)");
     if (error) { console.error("fetchVideos error:", error); return []; }
     return (data || []).map((row) => videoFromRow(row as Record<string, unknown>));
   } catch (err) { console.error("fetchVideos exception:", err); return []; }
@@ -110,7 +118,11 @@ export async function upsertVideo(video: Video): Promise<void> {
   try {
     const row = videoToRow(video);
     const { error } = await supabase.from("videos").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertVideo error:", error);
+    if (error) {
+      console.error("upsertVideo error:", error);
+    } else if (video.attachments && video.attachments.length > 0) {
+      await saveAttachments(video.attachments, { videoId: video.id });
+    }
   } catch (err) { console.error("upsertVideo exception:", err); }
 }
 
@@ -136,18 +148,32 @@ export async function updateVideoField(id: string, field: string, value: unknown
 
 export async function fetchLeads(): Promise<Lead[]> {
   try {
-    const { data, error } = await supabase.from("leads").select("*");
+    const { data, error } = await supabase.from("leads").select("*, attachments(*)");
     if (error) { console.error("fetchLeads error:", error); return []; }
-    return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as Lead);
+    return (data || []).map((row) => {
+      const camel = toCamelCase(row as Record<string, unknown>) as unknown as Lead;
+      if (row.attachments) {
+        camel.attachments = (row.attachments as any[]).map(a => toCamelCase(a) as unknown as Attachment);
+      }
+      return camel;
+    });
   } catch (err) { console.error("fetchLeads exception:", err); return []; }
 }
 
 export async function upsertLead(lead: Lead): Promise<void> {
   try {
-    const row = toSnakeCase(lead as unknown as Record<string, unknown>);
+    const { attachments, ...leadData } = lead;
+    const row = toSnakeCase(leadData as unknown as Record<string, unknown>);
+    console.log("Upserting lead row:", row);
     const { error } = await supabase.from("leads").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertLead error:", error);
-  } catch (err) { console.error("upsertLead exception:", err); }
+    if (error) {
+      console.error("upsertLead error object:", JSON.stringify(error, null, 2));
+    } else if (attachments && attachments.length > 0) {
+      await saveAttachments(attachments, { leadId: lead.id });
+    }
+  } catch (err) {
+    console.error("upsertLead exception:", err);
+  }
 }
 
 export async function deleteLead(id: string): Promise<void> {
@@ -224,17 +250,28 @@ export async function deleteOnboarding(id: string): Promise<void> {
 
 export async function fetchAds(): Promise<AdCampaign[]> {
   try {
-    const { data, error } = await supabase.from("ads").select("*");
+    const { data, error } = await supabase.from("ads").select("*, attachments(*)");
     if (error) { console.error("fetchAds error:", error); return []; }
-    return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as AdCampaign);
+    return (data || []).map((row) => {
+      const camel = toCamelCase(row as Record<string, unknown>) as unknown as AdCampaign;
+      if (row.attachments) {
+        camel.attachments = (row.attachments as any[]).map(a => toCamelCase(a) as unknown as Attachment);
+      }
+      return camel;
+    });
   } catch (err) { console.error("fetchAds exception:", err); return []; }
 }
 
 export async function upsertAd(ad: AdCampaign): Promise<void> {
   try {
-    const row = toSnakeCase(ad as unknown as Record<string, unknown>);
+    const { attachments, ...adData } = ad;
+    const row = toSnakeCase(adData as unknown as Record<string, unknown>);
     const { error } = await supabase.from("ads").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertAd error:", error);
+    if (error) {
+      console.error("upsertAd error:", error);
+    } else if (attachments && attachments.length > 0) {
+      await saveAttachments(attachments, { adId: ad.id });
+    }
   } catch (err) { console.error("upsertAd exception:", err); }
 }
 
@@ -251,17 +288,28 @@ export async function deleteAd(id: string): Promise<void> {
 
 export async function fetchKBDocs(): Promise<KBDoc[]> {
   try {
-    const { data, error } = await supabase.from("kb_docs").select("*");
+    const { data, error } = await supabase.from("kb_docs").select("*, attachments(*)");
     if (error) { console.error("fetchKBDocs error:", error); return []; }
-    return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as KBDoc);
+    return (data || []).map((row) => {
+      const camel = toCamelCase(row as Record<string, unknown>) as unknown as KBDoc;
+      if (row.attachments) {
+        camel.attachments = (row.attachments as any[]).map(a => toCamelCase(a) as unknown as Attachment);
+      }
+      return camel;
+    });
   } catch (err) { console.error("fetchKBDocs exception:", err); return []; }
 }
 
 export async function upsertKBDoc(doc: KBDoc): Promise<void> {
   try {
-    const row = toSnakeCase(doc as unknown as Record<string, unknown>);
+    const { attachments, ...docData } = doc;
+    const row = toSnakeCase(docData as unknown as Record<string, unknown>);
     const { error } = await supabase.from("kb_docs").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertKBDoc error:", error);
+    if (error) {
+      console.error("upsertKBDoc error:", error);
+    } else if (attachments && attachments.length > 0) {
+      await saveAttachments(attachments, { kbDocId: doc.id });
+    }
   } catch (err) { console.error("upsertKBDoc exception:", err); }
 }
 
@@ -297,7 +345,7 @@ function userToRow(user: AppUser): Record<string, unknown> {
 
 export async function fetchUsers(): Promise<AppUser[]> {
   try {
-    const { data, error } = await supabase.from("users").select("*");
+    const { data, error } = await supabase.from("profiles").select("*");
     if (error) { console.error("fetchUsers error:", error); return []; }
     return (data || []).map((row) => userFromRow(row as Record<string, unknown>));
   } catch (err) { console.error("fetchUsers exception:", err); return []; }
@@ -306,30 +354,20 @@ export async function fetchUsers(): Promise<AppUser[]> {
 export async function upsertUser(user: AppUser): Promise<void> {
   try {
     const row = userToRow(user);
-    const { error } = await supabase.from("users").upsert(row, { onConflict: "id" });
+    const { error } = await supabase.from("profiles").upsert(row, { onConflict: "id" });
     if (error) console.error("upsertUser error:", error);
   } catch (err) { console.error("upsertUser exception:", err); }
 }
 
 export async function deleteUser(id: string): Promise<void> {
   try {
-    const { error } = await supabase.from("users").delete().eq("id", id);
+    const { error } = await supabase.from("profiles").delete().eq("id", id);
     if (error) console.error("deleteUser error:", error);
   } catch (err) { console.error("deleteUser exception:", err); }
 }
 
-export async function authenticateUser(username: string, password: string): Promise<AppUser | null> {
-  try {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("username", username)
-      .eq("password", password)
-      .single();
-    if (error || !data) { return null; }
-    return userFromRow(data as Record<string, unknown>);
-  } catch (err) { console.error("authenticateUser exception:", err); return null; }
-}
+
+
 
 /* ═══════════════════════════════════════════════════════
    ACTIVITY LOG
@@ -355,6 +393,30 @@ export async function logActivityToDb(entry: Omit<ActivityEntry, "id" | "timesta
     const { error } = await supabase.from("activity_log").insert(row);
     if (error) console.error("logActivityToDb error:", error);
   } catch (err) { console.error("logActivityToDb exception:", err); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ATTACHMENTS
+   ═══════════════════════════════════════════════════════ */
+
+export async function saveAttachments(
+  attachments: Attachment[],
+  ids: { videoId?: string; leadId?: string; adId?: string; kbDocId?: string }
+): Promise<void> {
+  try {
+    const rows = attachments.map((att) => {
+      const row = toSnakeCase(att as unknown as Record<string, unknown>);
+      // Add the foreign keys (already snake_cased by toSnakeCase if they were in CamelCase,
+      // but here they are already in the keys of 'ids')
+      if (ids.videoId) row.video_id = ids.videoId;
+      if (ids.leadId) row.lead_id = ids.leadId;
+      if (ids.adId) row.ad_id = ids.adId;
+      if (ids.kbDocId) row.kb_doc_id = ids.kbDocId;
+      return row;
+    });
+    const { error } = await supabase.from("attachments").upsert(rows, { onConflict: "id" });
+    if (error) console.error("saveAttachments error:", error);
+  } catch (err) { console.error("saveAttachments exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════

@@ -147,6 +147,7 @@ export default function SalesPage({
 
   const handleCreateLead = () => {
     if (!formData.contactName || !formData.company || !formData.email || !formData.source) {
+      showToast("Please fill in all required fields", "error");
       return;
     }
 

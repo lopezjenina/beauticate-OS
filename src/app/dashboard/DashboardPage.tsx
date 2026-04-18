@@ -3,7 +3,8 @@
 import React, { useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Client, Video, Lead, AdCampaign } from "@/lib/types";
-import { TEAM, EDITORS, WEEKLY_TARGET, INIT_CLIENTS, INIT_VIDEOS, INIT_LEADS, INIT_ADS } from "@/lib/store";
+import { WEEKLY_TARGET } from "@/lib/store";
+import { AppUser } from "@/lib/auth";
 import { Avatar, Badge, Btn, Stat, PageHeader, ProgressBar, EmptyState } from "@/components/ui";
 import { exportClients, exportLeads, exportVideos, exportCampaigns } from "@/lib/exportCsv";
 
@@ -12,6 +13,7 @@ interface DashboardPageProps {
   videos?: Video[];
   leads?: Lead[];
   ads?: AdCampaign[];
+  users?: AppUser[];
 }
 
 /* ─── Design Tokens ─── */
@@ -23,11 +25,12 @@ const ACCENT_ORANGE = "#F59E0B";
 const ACCENT_RED = "#EF4444";
 
 const cardStyle: React.CSSProperties = {
-  background: "#FFF",
-  border: "1px solid #E8E8E6",
-  borderRadius: 12,
-  padding: 24,
-  boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+  background: "#FFFFFF",
+  border: "1px solid var(--border)",
+  borderRadius: 24,
+  padding: 32,
+  boxShadow: "0 10px 40px -10px rgba(0,0,0,0.04)",
+  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
 };
 
 const statValue: React.CSSProperties = {
@@ -45,13 +48,14 @@ const statLabel: React.CSSProperties = {
   letterSpacing: "0.04em",
 };
 
-const sectionGap = 20;
+const sectionGap = 32;
 
 export default function DashboardPage({
-  clients = INIT_CLIENTS,
-  videos = INIT_VIDEOS,
-  leads = INIT_LEADS,
-  ads = INIT_ADS,
+  clients = [],
+  videos = [],
+  leads = [],
+  ads = [],
+  users = [],
 }: DashboardPageProps) {
   const today = new Date("2026-03-30");
   const [periodFilter, setPeriodFilter] = useState("month");
@@ -78,9 +82,10 @@ export default function DashboardPage({
 
   const editorCapacity = useMemo(() => {
     const assigned = videos.filter((v) => v.editingStatus !== "approved").length;
-    const totalCap = EDITORS.reduce((sum, e) => sum + e.weeklyVideoCap, 0);
-    return Math.round((assigned / totalCap) * 100);
-  }, [videos]);
+    const editors = users.filter((u) => u.role === "editor");
+    const totalCap = editors.length * 22; // Default cap 22 since we removed static cap
+    return totalCap > 0 ? Math.round((assigned / totalCap) * 100) : 0;
+  }, [videos, users]);
 
   const contentPendingApproval = useMemo(
     () => videos.filter((v) => v.editingStatus === "delivered").length,
@@ -180,30 +185,42 @@ export default function DashboardPage({
 
   // ─── Team Performance ───
   const teamData = useMemo(() => {
-    return EDITORS.map((editor) => {
+    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
+    return editors.map((editor) => {
       const editorVideos = videos.filter((v) => v.editorId === editor.id);
       const assigned = editorVideos.filter((v) => v.editingStatus !== "approved").length;
       const completed = editorVideos.filter((v) => v.editingStatus === "approved").length;
-      const capacityPct = editor.weeklyVideoCap > 0
-        ? Math.round((assigned / editor.weeklyVideoCap) * 100)
-        : 0;
-      return { editor, assigned, completed, total: editorVideos.length, capacityPct };
+      const weeklyVideoCap = 22;
+      const capacityPct = Math.round((assigned / weeklyVideoCap) * 100);
+      return { 
+        editor: { 
+          ...editor, 
+          name: editor.username, 
+          initials: editor.username.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() 
+        }, 
+        assigned, 
+        completed, 
+        total: editorVideos.length, 
+        capacityPct 
+      };
     });
-  }, [videos]);
+  }, [videos, users]);
 
   // ─── Bottlenecks ───
   const editorsOverCapacity = useMemo(() => {
-    return EDITORS.map((editor) => {
+    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
+    return editors.map((editor) => {
       const assigned = videos.filter(
         (v) => v.editorId === editor.id && v.editingStatus !== "approved"
       ).length;
+      const weeklyCap = editor.weeklyVideoCap || 22;
       return {
-        editor,
+        editor: { ...editor, name: editor.username, weeklyVideoCap: weeklyCap },
         assigned,
-        isCapped: assigned > editor.weeklyVideoCap,
+        isCapped: assigned > weeklyCap,
       };
     }).filter((e) => e.isCapped);
-  }, [videos]);
+  }, [videos, users]);
 
   const contentNotScheduledAhead = useMemo(() => {
     const sevenDaysOut = new Date(today);
@@ -228,7 +245,8 @@ export default function DashboardPage({
 
   // ─── Editor Chart Data ───
   const chartData = useMemo(() => {
-    return EDITORS.map((editor) => {
+    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
+    return editors.map((editor) => {
       const assigned = videos.filter(
         (v) => v.editorId === editor.id && v.editingStatus !== "approved"
       ).length;
@@ -236,12 +254,12 @@ export default function DashboardPage({
         (v) => v.editorId === editor.id && v.editingStatus === "approved"
       ).length;
       return {
-        name: editor.initials,
+        name: editor.username.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
         assigned,
         completed,
       };
     });
-  }, [videos]);
+  }, [videos, users]);
 
   // ─── Helpers ───
   const fmtCurrency = (n: number) => {
@@ -295,7 +313,7 @@ export default function DashboardPage({
         key: `oc-${item.editor.id}`,
         severity: "danger",
         title: `${item.editor.name} over capacity`,
-        detail: `${item.assigned}/${item.editor.weeklyVideoCap} videos assigned`,
+        detail: `${item.assigned}/${item.editor.weeklyVideoCap || 22} videos assigned`,
       });
     });
     contentNotScheduledAhead.slice(0, 5).forEach((v) => {
@@ -335,7 +353,7 @@ export default function DashboardPage({
   };
 
   return (
-    <div style={{ background: "#F8F8FA", minHeight: "100vh", padding: "40px 48px" }}>
+    <div style={{ background: "transparent", minHeight: "100vh", padding: "0" }}>
 
       {/* ═══════════════ 1. Header Row ═══════════════ */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: sectionGap + 4 }}>

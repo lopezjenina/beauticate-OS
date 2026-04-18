@@ -3,11 +3,12 @@
 import { useState, useMemo } from 'react';
 import { Avatar, Badge, Btn, Stat, PageHeader, ProgressBar } from '@/components/ui';
 import { Video } from '@/lib/types';
-import { TEAM, EDITORS, WEEKLY_TARGET } from '@/lib/store';
+import { WEEKLY_TARGET } from '@/lib/store';
+import { AppUser } from '@/lib/auth';
 
 /* ─── Types ─── */
 interface EditorStats {
-  editor: typeof EDITORS[0];
+  editor: AppUser & { initials: string; name: string };
   assigned: number;
   completed: number;
   onTimeCount: number;
@@ -46,13 +47,19 @@ const cardStyle: React.CSSProperties = {
 };
 
 /* ─── Component ─── */
-export default function EditorsPage({ videos }: { videos: Video[] }) {
+export default function EditorsPage({ videos, users = [] }: { videos: Video[], users?: AppUser[] }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Calculate stats per editor
-  const editorStats: EditorStats[] = useMemo(
-    () =>
-      EDITORS.map((editor) => {
+  const editorStats: EditorStats[] = useMemo(() => {
+    const editorsList = users.filter(u => u.role === 'editor' || u.role === 'videographer')
+      .map(u => ({
+        ...u,
+        name: u.username,
+        initials: u.username.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+      }));
+
+    return editorsList.map((editor) => {
         const editorVideos = videos.filter((v) => v.editorId === editor.id);
         const assigned = editorVideos.length;
         const completed = editorVideos.filter(
@@ -82,9 +89,8 @@ export default function EditorsPage({ videos }: { videos: Video[] }) {
           status: getStatus(capacityPercent),
           statusColor: getCapacityColor(capacityPercent),
         };
-      }),
-    [videos]
-  );
+      });
+  }, [videos, users]);
 
   // Weekly totals
   const totalAssigned = editorStats.reduce((s, e) => s + e.assigned, 0);
@@ -148,7 +154,7 @@ export default function EditorsPage({ videos }: { videos: Video[] }) {
             Total Editors
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 700, color: '#5B5FC7', letterSpacing: '-0.03em' }}>
-            {EDITORS.length}
+            {editorStats.length}
           </div>
         </div>
         {/* Weekly Target */}

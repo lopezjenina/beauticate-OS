@@ -1,4 +1,4 @@
-# Agency OS - Deployment Guide
+# Beauticate OS - Deployment Guide
 
 ## Prerequisites
 
@@ -12,11 +12,11 @@
 ## Step 1: Push to GitHub
 
 ```bash
-cd agency-os
+cd beauticate-os
 git init
 git add .
-git commit -m "Initial commit - Agency OS"
-git remote add origin https://github.com/YOUR_USERNAME/agency-os.git
+git commit -m "Initial commit - Beauticate OS"
+git remote add origin https://github.com/YOUR_USERNAME/beauticate-os.git
 git push -u origin main
 ```
 
@@ -35,7 +35,7 @@ git push -u origin main
 
 1. Go to vercel.com/dashboard
 2. Click "Add New Project"
-3. Import your `agency-os` GitHub repo
+3. Import your `beauticate-os` GitHub repo
 4. Set Framework Preset to "Next.js"
 5. Add Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
@@ -44,12 +44,12 @@ git push -u origin main
 
 ---
 
-## Step 4: Connect Domain (viralvisionmk.space)
+## Step 4: Connect Domain (beauticate.com or beauticate.shop)
 
 ### Option A: Cloudflare DNS (recommended)
 
 1. In Vercel, go to your project Settings > Domains
-2. Add `viralvisionmk.space`
+2. Add `beauticate.shop`
 3. Vercel will show you the required DNS records
 4. In Cloudflare, add a CNAME record:
    - Name: `@`

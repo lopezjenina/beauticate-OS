@@ -1,17 +1,19 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Video, Note } from "@/lib/types";
-import { TEAM, INIT_CLIENTS } from "@/lib/store";
+import { Video, Note, Client } from "@/lib/types";
+import { AppUser } from "@/lib/auth";
 import { PageHeader, Badge, Avatar, EmptyState, Stat, showToast } from "@/components/ui";
 
 interface Props {
   videos: Video[];
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
   userName: string;
+  clients?: Client[];
+  users?: AppUser[];
 }
 
-export default function ApprovalsPage({ videos, setVideos, userName }: Props) {
+export default function ApprovalsPage({ videos, setVideos, userName, clients = [], users = [] }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [revisionText, setRevisionText] = useState("");
   const [showRevisionInput, setShowRevisionInput] = useState<string | null>(null);
@@ -29,13 +31,15 @@ export default function ApprovalsPage({ videos, setVideos, userName }: Props) {
   const revisionCount = videos.filter(v => v.editingStatus === "revision").length;
 
   const getClientName = (clientId: string) =>
-    INIT_CLIENTS.find((c) => c.id === clientId)?.name || "Unknown";
+    clients.find((c) => c.id === clientId)?.name || "Unknown";
 
   const getEditorName = (editorId: string) =>
-    TEAM.find((t) => t.id === editorId)?.name || "Unknown";
+    users.find((u) => u.id === editorId)?.username || "Unknown";
 
-  const getEditorInitials = (editorId: string) =>
-    TEAM.find((t) => t.id === editorId)?.initials || "?";
+  const getEditorInitials = (editorId: string) => {
+    const name = users.find((u) => u.id === editorId)?.username || "?";
+    return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + "T00:00:00");

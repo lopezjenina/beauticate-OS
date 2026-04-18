@@ -3,16 +3,18 @@
 import { useState, useMemo } from 'react';
 import { Badge, Btn, PageHeader } from '@/components/ui';
 import { Client, Video } from '@/lib/types';
-import { INIT_CLIENTS, INIT_VIDEOS, TEAM } from '@/lib/store';
+import { AppUser } from '@/lib/auth';
 
 interface CalendarPageProps {
   clients?: Client[];
   videos?: Video[];
+  users?: AppUser[];
 }
 
 export default function CalendarPage({
-  clients = INIT_CLIENTS,
-  videos = INIT_VIDEOS,
+  clients = [],
+  videos = [],
+  users = [],
 }: CalendarPageProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Btn, PageHeader, Badge, ConfirmModal } from '@/components/ui';
 import { AppUser, ALL_PAGES } from '@/lib/auth';
 import { upsertUser, deleteUser as deleteUserDb } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 interface UsersPageProps {
   users: AppUser[];
@@ -21,6 +22,7 @@ const PAGE_LABELS: Record<string, string> = {
   publishing: "Publishing",
   editors: "Editors",
   ads: "Ads",
+  packages: "Packages",
   knowledge: "Knowledge Base",
   activity: "Activity Log",
 };
@@ -34,6 +36,8 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
   const [formPermissions, setFormPermissions] = useState<Record<string, boolean>>(
     Object.fromEntries(ALL_PAGES.map((p) => [p, true]))
   );
+  const [formError, setFormError] = useState('');
+  const [formLoading, setFormLoading] = useState(false);
 
   const resetForm = () => {
     setFormData({ username: '', email: '', password: '' });
@@ -41,43 +45,84 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
     setFormPermissions(Object.fromEntries(ALL_PAGES.map((p) => [p, true])));
     setEditingUser(null);
     setShowModal(false);
+    setFormError('');
+    setFormLoading(false);
   };
 
   const handleEditUser = (user: AppUser) => {
-    setFormData({ username: user.username, email: user.email, password: user.password });
+    setFormData({ username: user.username, email: user.email, password: '' });
     setFormRole(user.role);
     setFormPermissions({ ...user.permissions });
     setEditingUser(user);
     setShowModal(true);
   };
 
-  const handleSaveUser = () => {
-    if (!formData.username || !formData.password) return;
+  const handleSaveUser = async () => {
+    if (!formData.username || !formData.email) {
+      setFormError('Username and email are required.');
+      return;
+    }
+
+    setFormLoading(true);
+    setFormError('');
 
     if (editingUser) {
-      const updatedUser = {
+      // Update existing user's profile (no password change via profile update)
+      const updatedUser: AppUser = {
         ...editingUser,
         username: formData.username,
         email: formData.email,
-        password: formData.password,
         role: formRole,
         permissions: formPermissions,
       };
       setUsers((prev) => prev.map((u) => u.id === editingUser.id ? updatedUser : u));
-      upsertUser(updatedUser);
+      await upsertUser(updatedUser);
+      resetForm();
     } else {
-      const newUser: AppUser = {
-        id: `u-${Date.now()}`,
-        username: formData.username,
+      // Create new user via Supabase Auth (requires service role — use invite instead)
+      if (!formData.password || formData.password.length < 6) {
+        setFormError('Password must be at least 6 characters for new users.');
+        setFormLoading(false);
+        return;
+      }
+
+      // Sign up the new user via Supabase Auth
+      // Note: This creates an auth.users entry, which triggers handle_new_user()
+      // to create the profiles row automatically.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        role: formRole,
-        permissions: formPermissions,
-      };
-      setUsers((prev) => [...prev, newUser]);
-      upsertUser(newUser);
+        options: {
+          data: {
+            username: formData.username,
+            full_name: formData.username,
+            role: formRole,
+          },
+        },
+      });
+
+      if (signUpError) {
+        setFormError(signUpError.message);
+        setFormLoading(false);
+        return;
+      }
+
+      if (signUpData.user) {
+        // Update the profile with permissions and role
+        const newUser: AppUser = {
+          id: signUpData.user.id,
+          username: formData.username,
+          email: formData.email,
+          role: formRole,
+          permissions: formPermissions,
+        };
+        // Update profile row (handle_new_user trigger already created it)
+        await upsertUser(newUser);
+        setUsers((prev) => [...prev, newUser]);
+      }
+
+      resetForm();
     }
-    resetForm();
   };
 
   const handleDeleteUser = () => {
@@ -203,7 +248,7 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Username</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Full Name</label>
                 <input
                   type="text" value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -217,20 +262,30 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                 <input
                   type="email" value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="user@agency.com"
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #E3E3E0', borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit' }}
+                  placeholder="user@beauticate.com"
+                  disabled={!!editingUser}
+                  style={{
+                    width: '100%', padding: '0.75rem', border: '1px solid #E3E3E0', borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit',
+                    opacity: editingUser ? 0.6 : 1,
+                  }}
                 />
+                {editingUser && (
+                  <p style={{ fontSize: 11, color: '#A0A0A0', marginTop: 4 }}>Email cannot be changed after account creation.</p>
+                )}
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Password</label>
-                <input
-                  type="password" value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Password"
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #E3E3E0', borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit' }}
-                />
-              </div>
+              {/* Password field only for new users */}
+              {!editingUser && (
+                <div>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Password</label>
+                  <input
+                    type="password" value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Min. 6 characters"
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #E3E3E0', borderRadius: 6, fontSize: '0.9rem', fontFamily: 'inherit' }}
+                  />
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#6B6B6B', display: 'block', marginBottom: '0.5rem' }}>Role</label>
@@ -265,12 +320,18 @@ export default function UsersPage({ users, setUsers }: UsersPageProps) {
                   ))}
                 </div>
               </div>
+
+              {formError && (
+                <div style={{ fontSize: 13, color: '#DC3545', background: '#FDF2F2', padding: '10px 14px', borderRadius: 8, border: '1px solid #FECACA' }}>
+                  {formError}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
               <Btn onClick={resetForm}>Cancel</Btn>
-              <Btn variant="primary" onClick={handleSaveUser}>
-                {editingUser ? 'Save Changes' : 'Create User'}
+              <Btn variant="primary" onClick={handleSaveUser} disabled={formLoading}>
+                {formLoading ? 'Saving...' : editingUser ? 'Save Changes' : 'Create User'}
               </Btn>
             </div>
           </div>

@@ -6,7 +6,7 @@ export async function sendEmail({
   to,
   subject,
   html,
-  from = 'Beauticate <onboarding@resend.dev>',
+  from = 'Support @ Beauticate <support@beauticate.space>',
 }: {
   to: string | string[];
   subject: string;

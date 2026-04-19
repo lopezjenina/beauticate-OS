@@ -140,6 +140,7 @@ export type ContentPipeline = {
   createdBy?: string;
   wpPostId?: number;
   wpUrl?: string;
+  scheduledDate?: string;
   createdAt?: string;
   updatedAt?: string;
 };

@@ -290,7 +290,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
       
       await upsertContent(updated);
       showToast("Uploaded as Draft to WordPress!", "success");
-      logActivity({ user: userName || "Unknown", action: "published", entity: "document", entityName: item.title, details: `Uploaded as Draft to WP (ID: ${postId})` });
+      logActivity({ user: userName || "Unknown", action: "moved", entity: "document", entityName: item.title, details: `Uploaded as Draft to WP (ID: ${postId})` });
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {

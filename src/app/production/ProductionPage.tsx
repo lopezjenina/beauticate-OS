@@ -423,19 +423,7 @@ export default function ProductionPage({
                         >
                           Ready
                         </th>
-                        <th
-                          style={{
-                            padding: '16px 24px',
-                            textAlign: 'center',
-                            fontWeight: '700',
-                            color: 'var(--text-sec)',
-                            fontSize: '11px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.04em',
-                          }}
-                        >
-                          Guido
-                        </th>
+
                         <th
                           style={{
                             padding: '16px 24px',
@@ -574,10 +562,6 @@ export default function ProductionPage({
                                 {!isPlaceholder && (video.editingStatus === 'approved' ? <Badge variant="success">Yes</Badge> : <Badge>No</Badge>)}
                               </td>
 
-                              {/* Sent to Guido */}
-                              <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                                {!isPlaceholder && <Checkbox checked={video.sentToGuido || false} onChange={() => handleVideoPropertyChange(video.id, 'sentToGuido', !video.sentToGuido)} />}
-                              </td>
 
                               {/* Posted */}
                               <td style={{ padding: '16px 24px', textAlign: 'center' }}>
@@ -599,7 +583,7 @@ export default function ProductionPage({
                             {/* Expanded Row */}
                             {isRowExpanded && !isPlaceholder && (
                               <tr>
-                                <td colSpan={canDelete ? 11 : 10} style={{ padding: 0 }}>
+                                <td colSpan={canDelete ? 10 : 9} style={{ padding: 0 }}>
                                   <div style={{ background: "#F7F7F5", padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
                                       {/* Specific Video Info */}

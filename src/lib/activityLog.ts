@@ -14,7 +14,7 @@ let activityLog: ActivityEntry[] = [];
 export function logActivity(entry: Omit<ActivityEntry, "id" | "timestamp">) {
   activityLog = [{
     ...entry,
-    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `log-${crypto.randomUUID()}`,
     timestamp: new Date().toISOString(),
   }, ...activityLog].slice(0, 200); // Keep last 200 entries
 }

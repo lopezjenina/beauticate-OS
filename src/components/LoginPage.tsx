@@ -31,6 +31,11 @@ export function LoginPage({
       setError("Please enter your email address.");
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -128,7 +133,10 @@ export function LoginPage({
                 fontSize: 24,
               }}
             >
-              ✉️
+              <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
             </div>
             <div>
               <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text)", margin: "0 0 8px" }}>
@@ -208,7 +216,7 @@ export function LoginPage({
             </button>
 
             <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-ter)", margin: 0, lineHeight: 1.5 }}>
-              🔒 No password needed. We'll send a secure link to your inbox.
+              No password needed. We'll send a secure link to your inbox.
             </p>
           </div>
         )}

@@ -120,7 +120,7 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
             display: "flex", alignItems: "center", gap: 12,
           }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "#E8F0FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
-              &#128229;
+              
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#1A1A1A" }}>{deliveredCount}</div>
@@ -132,7 +132,7 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
             display: "flex", alignItems: "center", gap: 12,
           }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: revisionCount > 0 ? "#FDF3E7" : "#EAF5F2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
-              &#128260;
+              
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 700, color: revisionCount > 0 ? "#CB7F2C" : "#1A1A1A" }}>{revisionCount}</div>
@@ -144,7 +144,7 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
             display: "flex", alignItems: "center", gap: 12,
           }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, background: "#EAF5F2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
-              &#9989;
+              
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#4DAB9A" }}>{deliveredCount + revisionCount}</div>
@@ -373,7 +373,7 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
                             cursor: "pointer", fontFamily: "inherit",
                           }}
                         >
-                          Approve & Send to Guido
+                          Approve Video
                         </button>
                         {showRevisionInput !== video.id && (
                           <button

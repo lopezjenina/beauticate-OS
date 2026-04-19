@@ -25,7 +25,7 @@ function AuthErrorContent() {
   if (isRecovering) {
     return (
       <div style={{ textAlign: "center", color: "#6B6B6B" }}>
-        <div style={{ fontSize: 24, marginBottom: 16 }}>🔄</div>
+        <div style={{ fontSize: 24, marginBottom: 16 }}></div>
         <h1 style={{ fontSize: 20, color: "#1A1A1A", marginBottom: 8 }}>Authenticating...</h1>
         <p>Please wait a moment.</p>
       </div>
@@ -57,10 +57,10 @@ function AuthErrorContent() {
           background: "rgba(255, 59, 48, 0.1)",
           border: "1px solid rgba(255, 59, 48, 0.2)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 28,
         }}
       >
-        {isExpired ? "⏰" : "⚠️"}
+        <div style={{ fontSize: 40, marginBottom: 16 }}>
+        </div>
       </div>
 
       <div>

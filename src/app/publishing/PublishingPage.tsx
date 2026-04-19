@@ -28,7 +28,7 @@ export default function PublishingPage({ videos, setVideos, userName, clients = 
   const [noteText, setNoteText] = useState("");
 
   const publishingVideos = videos.filter(
-    (v) => v.editingStatus === "approved" && v.sentToGuido === true
+    (v) => v.editingStatus === "approved"
   );
 
   const getClientName = (clientId: string) =>
@@ -184,7 +184,7 @@ export default function PublishingPage({ videos, setVideos, userName, clients = 
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <PageHeader
           title="Content Publishing"
-          subtitle="Guido's board: Production → Distribution"
+          subtitle="Pipeline: Production → Distribution"
         />
 
         {/* Stats Bar */}

@@ -194,7 +194,7 @@ alter table activity_log enable row level security;
 create table attachments (
   id text primary key default concat('att-', uuid_generate_v4()::text),
   name text not null,
-  url text not null,
+  url text not null constraint url_format check (url ~* '^https?://'),
   type text not null check (type in ('image', 'video', 'document', 'link')),
   thumbnail_url text,
   added_at text not null,

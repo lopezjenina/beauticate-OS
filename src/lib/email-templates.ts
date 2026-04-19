@@ -3,6 +3,15 @@
  * Used with Resend (src/lib/email.ts)
  */
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 const BASE_STYLE = `
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   max-width: 600px;
@@ -41,11 +50,11 @@ export const videoApprovalTemplate = (clientName: string, videoTitle: string, ap
     Production Update
   </div>
   <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.025em;">
-    Review Ready: ${videoTitle}
+    Review Ready: ${escapeHtml(videoTitle)}
   </h1>
   <p style="font-size: 16px; line-height: 24px; color: #4b5563; margin-bottom: 24px;">
-    Hi ${clientName},<br><br>
-    Our team has finished editing <strong>${videoTitle}</strong>. It's now ready for your review. 
+    Hi ${escapeHtml(clientName)},<br><br>
+    Our team has finished editing <strong>${escapeHtml(videoTitle)}</strong>. It's now ready for your review. 
     You can view the draft and provide feedback or approve it for final delivery using the link below.
   </p>
   <a href="${approvalUrl}" style="${BUTTON_STYLE}">View & Action Video</a>
@@ -67,8 +76,8 @@ export const assignmentTemplate = (staffName: string, clientName: string, dashbo
     Client Onboarding Assigned
   </h1>
   <p style="font-size: 16px; line-height: 24px; color: #4b5563; margin-bottom: 24px;">
-    Hi ${staffName},<br><br>
-    You have been assigned to lead the onboarding and production for <strong>${clientName}</strong>. 
+    Hi ${escapeHtml(staffName)},<br><br>
+    You have been assigned to lead the onboarding and production for <strong>${escapeHtml(clientName)}</strong>. 
     Please head to the dashboard to review their requirements and start the project.
   </p>
   <a href="${dashboardUrl}" style="${BUTTON_STYLE}">Open Dashboard</a>
@@ -87,7 +96,7 @@ export const welcomeTemplate = (clientName: string, dashboardUrl: string) => `
     BEAUTICATE.
   </div>
   <h1 style="font-size: 24px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.025em;">
-    Welcome to the Agency, ${clientName}
+    Welcome to the Agency, ${escapeHtml(clientName)}
   </h1>
   <p style="font-size: 16px; line-height: 24px; color: #4b5563; margin-bottom: 24px;">
     We're thrilled to have you on board. Your production environment is now set up and ready to go. 

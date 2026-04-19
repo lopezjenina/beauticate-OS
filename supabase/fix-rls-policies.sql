@@ -27,10 +27,16 @@ END $$;
 
 -- ─── Create proper authenticated policies with USING + WITH CHECK ───
 
-CREATE POLICY "Authenticated full access to profiles"
-  ON profiles FOR ALL
-  USING (auth.role() = 'authenticated')
-  WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Users read own profile" ON profiles FOR SELECT
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users update own profile" ON profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+CREATE POLICY "Admins read all profiles" ON profiles FOR SELECT
+  USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'superadmin'))
+  );
 
 CREATE POLICY "Authenticated full access to clients"
   ON clients FOR ALL

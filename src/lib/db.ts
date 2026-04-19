@@ -14,6 +14,12 @@ import { ActivityEntry } from "./activityLog";
 import { sendEmail } from "./email";
 import { videoApprovalTemplate, assignmentTemplate, welcomeTemplate } from "./email-templates";
 
+export const dbError = (msg: string, err: unknown) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(msg, err);
+  }
+};
+
 /* ─── Key-case helpers ─── */
 
 function camelToSnake(str: string): string {
@@ -58,24 +64,24 @@ export type ServicePackage = {
 export async function fetchClients(): Promise<Client[]> {
   try {
     const { data, error } = await supabase.from("clients").select("*");
-    if (error) { console.error("fetchClients error:", error); return []; }
+    if (error) { dbError("fetchClients error:", error); return []; }
     return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as Client);
-  } catch (err) { console.error("fetchClients exception:", err); return []; }
+  } catch (err) { dbError("fetchClients exception:", err); return []; }
 }
 
 export async function upsertClient(client: Client): Promise<void> {
   try {
     const row = toSnakeCase(client as unknown as Record<string, unknown>);
     const { error } = await supabase.from("clients").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertClient error:", error);
-  } catch (err) { console.error("upsertClient exception:", err); }
+    if (error) dbError("upsertClient error:", error);
+  } catch (err) { dbError("upsertClient exception:", err); }
 }
 
 export async function deleteClient(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("clients").delete().eq("id", id);
-    if (error) console.error("deleteClient error:", error);
-  } catch (err) { console.error("deleteClient exception:", err); }
+    if (error) dbError("deleteClient error:", error);
+  } catch (err) { dbError("deleteClient exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -111,9 +117,9 @@ function videoToRow(video: Video): Record<string, unknown> {
 export async function fetchVideos(): Promise<Video[]> {
   try {
     const { data, error } = await supabase.from("videos").select("*, attachments(*)");
-    if (error) { console.error("fetchVideos error:", error); return []; }
+    if (error) { dbError("fetchVideos error:", error); return []; }
     return (data || []).map((row) => videoFromRow(row as Record<string, unknown>));
-  } catch (err) { console.error("fetchVideos exception:", err); return []; }
+  } catch (err) { dbError("fetchVideos exception:", err); return []; }
 }
 
 export async function upsertVideo(video: Video, prevStatus?: string): Promise<void> {
@@ -121,7 +127,7 @@ export async function upsertVideo(video: Video, prevStatus?: string): Promise<vo
     const row = videoToRow(video);
     const { error } = await supabase.from("videos").upsert(row, { onConflict: "id" });
     if (error) {
-      console.error("upsertVideo error:", error);
+      dbError("upsertVideo error:", error);
     } else {
       if (video.attachments && video.attachments.length > 0) {
         await saveAttachments(video.attachments, { videoId: video.id });
@@ -143,18 +149,18 @@ export async function upsertVideo(video: Video, prevStatus?: string): Promise<vo
               video.title,
               "https://beauticate.space"
             ),
-          }).catch((e) => console.error("Video approval email failed:", e));
+          }).catch((e) => dbError("Video approval email failed:", e));
         }
       }
     }
-  } catch (err) { console.error("upsertVideo exception:", err); }
+  } catch (err) { dbError("upsertVideo exception:", err); }
 }
 
 export async function deleteVideo(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("videos").delete().eq("id", id);
-    if (error) console.error("deleteVideo error:", error);
-  } catch (err) { console.error("deleteVideo exception:", err); }
+    if (error) dbError("deleteVideo error:", error);
+  } catch (err) { dbError("deleteVideo exception:", err); }
 }
 
 export async function updateVideoField(id: string, field: string, value: unknown): Promise<void> {
@@ -162,8 +168,8 @@ export async function updateVideoField(id: string, field: string, value: unknown
     const snakeField = camelToSnake(field);
     const dbValue = field === "notes" ? JSON.stringify(value) : value;
     const { error } = await supabase.from("videos").update({ [snakeField]: dbValue }).eq("id", id);
-    if (error) console.error("updateVideoField error:", error);
-  } catch (err) { console.error("updateVideoField exception:", err); }
+    if (error) dbError("updateVideoField error:", error);
+  } catch (err) { dbError("updateVideoField exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -173,7 +179,7 @@ export async function updateVideoField(id: string, field: string, value: unknown
 export async function fetchLeads(): Promise<Lead[]> {
   try {
     const { data, error } = await supabase.from("leads").select("*, attachments(*)");
-    if (error) { console.error("fetchLeads error:", error); return []; }
+    if (error) { dbError("fetchLeads error:", error); return []; }
     return (data || []).map((row) => {
       const camel = toCamelCase(row as Record<string, unknown>) as unknown as Lead;
       if (row.attachments) {
@@ -181,7 +187,7 @@ export async function fetchLeads(): Promise<Lead[]> {
       }
       return camel;
     });
-  } catch (err) { console.error("fetchLeads exception:", err); return []; }
+  } catch (err) { dbError("fetchLeads exception:", err); return []; }
 }
 
 export async function upsertLead(lead: Lead, isNew = false): Promise<void> {
@@ -190,7 +196,7 @@ export async function upsertLead(lead: Lead, isNew = false): Promise<void> {
     const row = toSnakeCase(leadData as unknown as Record<string, unknown>);
     const { error } = await supabase.from("leads").upsert(row, { onConflict: "id" });
     if (error) {
-      console.error("upsertLead error object:", JSON.stringify(error, null, 2));
+      dbError("upsertLead error object:", JSON.stringify(error, null, 2));
     } else {
       if (attachments && attachments.length > 0) {
         await saveAttachments(attachments, { leadId: lead.id });
@@ -199,25 +205,25 @@ export async function upsertLead(lead: Lead, isNew = false): Promise<void> {
       if (isNew && lead.email) {
         sendEmail({
           to: "support@beauticate.space",
-          subject: `🎯 New Lead: ${lead.contactName} — ${lead.company}`,
+          subject: `New Lead: ${lead.contactName} — ${lead.company}`,
           html: assignmentTemplate(
             "Beauticate Team",
             `${lead.contactName} (${lead.company})`,
             "https://beauticate.space"
-          ),
-        }).catch((e) => console.error("Lead notification email failed:", e));
+          )
+        }).catch((e) => dbError("Lead notification email failed:", e));
       }
     }
   } catch (err) {
-    console.error("upsertLead exception:", err);
+    dbError("upsertLead exception:", err);
   }
 }
 
 export async function deleteLead(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("leads").delete().eq("id", id);
-    if (error) console.error("deleteLead error:", error);
-  } catch (err) { console.error("deleteLead exception:", err); }
+    if (error) dbError("deleteLead error:", error);
+  } catch (err) { dbError("deleteLead exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -261,9 +267,9 @@ function onboardingToRow(client: OnboardingClient): Record<string, unknown> {
 export async function fetchOnboarding(): Promise<OnboardingClient[]> {
   try {
     const { data, error } = await supabase.from("onboarding").select("*");
-    if (error) { console.error("fetchOnboarding error:", error); return []; }
+    if (error) { dbError("fetchOnboarding error:", error); return []; }
     return (data || []).map((row) => onboardingFromRow(row as Record<string, unknown>));
-  } catch (err) { console.error("fetchOnboarding exception:", err); return []; }
+  } catch (err) { dbError("fetchOnboarding exception:", err); return []; }
 }
 
 export async function upsertOnboarding(client: OnboardingClient): Promise<void> {
@@ -271,26 +277,26 @@ export async function upsertOnboarding(client: OnboardingClient): Promise<void> 
     const row = onboardingToRow(client);
     const { error } = await supabase.from("onboarding").upsert(row, { onConflict: "id" });
     if (error) {
-      console.error("upsertOnboarding error:", error);
+      dbError("upsertOnboarding error:", error);
     } else {
       // Send welcome email when ALL onboarding steps are complete
       const allDone = Object.values(client.steps).every(Boolean);
       if (allDone && client.contactEmail) {
         sendEmail({
           to: client.contactEmail,
-          subject: `Welcome to Beauticate, ${client.name}! 🎉`,
+          subject: `Welcome to Beauticate, ${client.name}!`,
           html: welcomeTemplate(client.contactPerson || client.name, "https://beauticate.space"),
-        }).catch((e) => console.error("Welcome email failed:", e));
+        }).catch((e) => dbError("Welcome email failed:", e));
       }
     }
-  } catch (err) { console.error("upsertOnboarding exception:", err); }
+  } catch (err) { dbError("upsertOnboarding exception:", err); }
 }
 
 export async function deleteOnboarding(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("onboarding").delete().eq("id", id);
-    if (error) console.error("deleteOnboarding error:", error);
-  } catch (err) { console.error("deleteOnboarding exception:", err); }
+    if (error) dbError("deleteOnboarding error:", error);
+  } catch (err) { dbError("deleteOnboarding exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -300,7 +306,7 @@ export async function deleteOnboarding(id: string): Promise<void> {
 export async function fetchAds(): Promise<AdCampaign[]> {
   try {
     const { data, error } = await supabase.from("ads").select("*, attachments(*)");
-    if (error) { console.error("fetchAds error:", error); return []; }
+    if (error) { dbError("fetchAds error:", error); return []; }
     return (data || []).map((row) => {
       const camel = toCamelCase(row as Record<string, unknown>) as unknown as AdCampaign;
       if (row.attachments) {
@@ -308,7 +314,7 @@ export async function fetchAds(): Promise<AdCampaign[]> {
       }
       return camel;
     });
-  } catch (err) { console.error("fetchAds exception:", err); return []; }
+  } catch (err) { dbError("fetchAds exception:", err); return []; }
 }
 
 export async function upsertAd(ad: AdCampaign): Promise<void> {
@@ -317,18 +323,18 @@ export async function upsertAd(ad: AdCampaign): Promise<void> {
     const row = toSnakeCase(adData as unknown as Record<string, unknown>);
     const { error } = await supabase.from("ads").upsert(row, { onConflict: "id" });
     if (error) {
-      console.error("upsertAd error:", error);
+      dbError("upsertAd error:", error);
     } else if (attachments && attachments.length > 0) {
       await saveAttachments(attachments, { adId: ad.id });
     }
-  } catch (err) { console.error("upsertAd exception:", err); }
+  } catch (err) { dbError("upsertAd exception:", err); }
 }
 
 export async function deleteAd(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("ads").delete().eq("id", id);
-    if (error) console.error("deleteAd error:", error);
-  } catch (err) { console.error("deleteAd exception:", err); }
+    if (error) dbError("deleteAd error:", error);
+  } catch (err) { dbError("deleteAd exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -338,7 +344,7 @@ export async function deleteAd(id: string): Promise<void> {
 export async function fetchKBDocs(): Promise<KBDoc[]> {
   try {
     const { data, error } = await supabase.from("kb_docs").select("*, attachments(*)");
-    if (error) { console.error("fetchKBDocs error:", error); return []; }
+    if (error) { dbError("fetchKBDocs error:", error); return []; }
     return (data || []).map((row) => {
       const camel = toCamelCase(row as Record<string, unknown>) as unknown as KBDoc;
       if (row.attachments) {
@@ -346,7 +352,7 @@ export async function fetchKBDocs(): Promise<KBDoc[]> {
       }
       return camel;
     });
-  } catch (err) { console.error("fetchKBDocs exception:", err); return []; }
+  } catch (err) { dbError("fetchKBDocs exception:", err); return []; }
 }
 
 export async function upsertKBDoc(doc: KBDoc): Promise<void> {
@@ -355,18 +361,18 @@ export async function upsertKBDoc(doc: KBDoc): Promise<void> {
     const row = toSnakeCase(docData as unknown as Record<string, unknown>);
     const { error } = await supabase.from("kb_docs").upsert(row, { onConflict: "id" });
     if (error) {
-      console.error("upsertKBDoc error:", error);
+      dbError("upsertKBDoc error:", error);
     } else if (attachments && attachments.length > 0) {
       await saveAttachments(attachments, { kbDocId: doc.id });
     }
-  } catch (err) { console.error("upsertKBDoc exception:", err); }
+  } catch (err) { dbError("upsertKBDoc exception:", err); }
 }
 
 export async function deleteKBDoc(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("kb_docs").delete().eq("id", id);
-    if (error) console.error("deleteKBDoc error:", error);
-  } catch (err) { console.error("deleteKBDoc exception:", err); }
+    if (error) dbError("deleteKBDoc error:", error);
+  } catch (err) { dbError("deleteKBDoc exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -395,24 +401,28 @@ function userToRow(user: AppUser): Record<string, unknown> {
 export async function fetchUsers(): Promise<AppUser[]> {
   try {
     const { data, error } = await supabase.from("profiles").select("*");
-    if (error) { console.error("fetchUsers error:", error); return []; }
+    if (error) { dbError("fetchUsers error:", error); return []; }
     return (data || []).map((row) => userFromRow(row as Record<string, unknown>));
-  } catch (err) { console.error("fetchUsers exception:", err); return []; }
+  } catch (err) { dbError("fetchUsers exception:", err); return []; }
 }
 
 export async function upsertUser(user: AppUser): Promise<void> {
   try {
     const row = userToRow(user);
     const { error } = await supabase.from("profiles").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertUser error:", error);
-  } catch (err) { console.error("upsertUser exception:", err); }
+    if (error) dbError("upsertUser error:", error);
+  } catch (err) { dbError("upsertUser exception:", err); }
 }
 
 export async function deleteUser(id: string): Promise<void> {
   try {
-    const { error } = await supabase.from("profiles").delete().eq("id", id);
-    if (error) console.error("deleteUser error:", error);
-  } catch (err) { console.error("deleteUser exception:", err); }
+    const response = await fetch(`/api/admin/create-user?userId=${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+       dbError("deleteUser error:", await response.text());
+    }
+  } catch (err) { dbError("deleteUser exception:", err); }
 }
 
 
@@ -429,9 +439,9 @@ export async function fetchActivityLog(): Promise<ActivityEntry[]> {
       .select("*")
       .order("timestamp", { ascending: false })
       .limit(200);
-    if (error) { console.error("fetchActivityLog error:", error); return []; }
+    if (error) { dbError("fetchActivityLog error:", error); return []; }
     return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as ActivityEntry);
-  } catch (err) { console.error("fetchActivityLog exception:", err); return []; }
+  } catch (err) { dbError("fetchActivityLog exception:", err); return []; }
 }
 
 export async function logActivityToDb(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void> {
@@ -440,8 +450,8 @@ export async function logActivityToDb(entry: Omit<ActivityEntry, "id" | "timesta
     row.id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     row.timestamp = new Date().toISOString();
     const { error } = await supabase.from("activity_log").insert(row);
-    if (error) console.error("logActivityToDb error:", error);
-  } catch (err) { console.error("logActivityToDb exception:", err); }
+    if (error) dbError("logActivityToDb error:", error);
+  } catch (err) { dbError("logActivityToDb exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -464,8 +474,8 @@ export async function saveAttachments(
       return row;
     });
     const { error } = await supabase.from("attachments").upsert(rows, { onConflict: "id" });
-    if (error) console.error("saveAttachments error:", error);
-  } catch (err) { console.error("saveAttachments exception:", err); }
+    if (error) dbError("saveAttachments error:", error);
+  } catch (err) { dbError("saveAttachments exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -494,22 +504,22 @@ function packageToRow(pkg: ServicePackage): Record<string, unknown> {
 export async function fetchPackages(): Promise<ServicePackage[]> {
   try {
     const { data, error } = await supabase.from("packages").select("*");
-    if (error) { console.error("fetchPackages error:", error); return []; }
+    if (error) { dbError("fetchPackages error:", error); return []; }
     return (data || []).map((row) => packageFromRow(row as Record<string, unknown>));
-  } catch (err) { console.error("fetchPackages exception:", err); return []; }
+  } catch (err) { dbError("fetchPackages exception:", err); return []; }
 }
 
 export async function upsertPackage(pkg: ServicePackage): Promise<void> {
   try {
     const row = packageToRow(pkg);
     const { error } = await supabase.from("packages").upsert(row, { onConflict: "id" });
-    if (error) console.error("upsertPackage error:", error);
-  } catch (err) { console.error("upsertPackage exception:", err); }
+    if (error) dbError("upsertPackage error:", error);
+  } catch (err) { dbError("upsertPackage exception:", err); }
 }
 
 export async function deletePackage(id: string): Promise<void> {
   try {
     const { error } = await supabase.from("packages").delete().eq("id", id);
-    if (error) console.error("deletePackage error:", error);
-  } catch (err) { console.error("deletePackage exception:", err); }
+    if (error) dbError("deletePackage error:", error);
+  } catch (err) { dbError("deletePackage exception:", err); }
 }

@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { PageHeader, Badge, Btn, Avatar, showToast } from "@/components/ui";
 import { logActivity } from "@/lib/activityLog";
-import { ContentPipeline, fetchContent, upsertContent, deleteContent } from "@/lib/db";
+import { fetchContent, upsertContent, deleteContent } from "@/lib/db";
+import { ContentPipeline } from "@/lib/types";
 
 interface Props {
   userName?: string;

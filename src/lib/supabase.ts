@@ -17,13 +17,7 @@ let _client: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
   if (!_client) {
-    _client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-      cookieOptions: {
-        path: "/",
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      },
-    });
+    _client = createBrowserClient(supabaseUrl, supabaseAnonKey);
   }
   return _client;
 }

@@ -5,9 +5,9 @@ import { createServerClient } from "@supabase/ssr";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const nextParam = searchParams.get("next") ?? "/dashboard";
+  const nextParam = searchParams.get("next") ?? "/";
   // Validate next is a relative path
-  const safePath = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/dashboard';
+  const safePath = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
 
   // No code param — this is a direct hit or prefetch, not a real callback.
   // Redirect to login quietly instead of the error page.
@@ -22,11 +22,6 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: {
-        path: "/",
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -40,10 +35,17 @@ export async function GET(request: NextRequest) {
     }
   );
 
+  // Check if we already have a session to avoid double-exchange errors
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    console.log('[auth/callback] Active session already exists, skipping exchange.');
+    return response;
+  }
+
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (!error) {
-    console.log('[auth/callback] Session exchange successful, redirecting to', safePath);
+    console.log('[auth/callback] Session exchange successful.');
     return response;
   }
 

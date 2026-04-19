@@ -205,6 +205,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [viewItem, setViewItem] = useState<ContentPipeline | null>(null);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [form, setForm] = useState({ title: "", content: "", type: "Blog Post", links: "", notes: "" });
 
@@ -305,7 +306,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
               </div>
               <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, overflowY: "auto", flex: 1 }}>
                 {items.map(item => (
-                  <ContentCard key={item.id} item={item} onOpen={() => setViewItem(item)} onOptimize={() => handleOptimize(item)} onAdvance={s => moveStatus(item, s)} optimizingId={optimizingId} />
+                  <ContentCard key={item.id} item={item} onOpen={() => { setViewItem(item); setIsEditing(false); }} onOptimize={() => handleOptimize(item)} onAdvance={s => moveStatus(item, s)} optimizingId={optimizingId} />
                 ))}
               </div>
             </div>
@@ -352,13 +353,28 @@ export default function PublishingPage({ userName }: { userName?: string }) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
                 <div>
                   <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#B88B58", marginBottom: 16, letterSpacing: "0.05em" }}>Original Draft</h4>
-                  <div style={{ background: "#FAFAF9", padding: 24, borderRadius: 16, border: "1px solid #EBEBE8", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-                    {viewItem.rawDraft}
-                  </div>
+                  {isEditing ? (
+                    <textarea 
+                      style={{ ...inputStyle, height: "calc(100% - 30px)", minHeight: 300, resize: "vertical" }}
+                      value={viewItem.rawDraft}
+                      onChange={e => setViewItem({ ...viewItem, rawDraft: e.target.value })}
+                    />
+                  ) : (
+                    <div style={{ background: "#FAFAF9", padding: 24, borderRadius: 16, border: "1px solid #EBEBE8", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+                      {viewItem.rawDraft}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", color: "#2383E2", marginBottom: 16, letterSpacing: "0.05em" }}>AI Optimized Version</h4>
-                  {viewItem.optimizedContent ? (
+                  {isEditing ? (
+                    <textarea 
+                      style={{ ...inputStyle, height: "calc(100% - 30px)", minHeight: 300, resize: "vertical", background: "#F0F7FF" }}
+                      value={viewItem.optimizedContent || ""}
+                      onChange={e => setViewItem({ ...viewItem, optimizedContent: e.target.value })}
+                      placeholder="No optimized content yet"
+                    />
+                  ) : viewItem.optimizedContent ? (
                     <div style={{ background: "#F0F7FF", padding: 24, borderRadius: 16, border: "1px solid #D0E3F5" }}>
                       <MarkdownRenderer content={viewItem.optimizedContent} />
                     </div>
@@ -374,9 +390,30 @@ export default function PublishingPage({ userName }: { userName?: string }) {
             <div style={{ padding: "20px 32px", borderTop: "1px solid #EEE", display: "flex", justifyContent: "space-between", background: "#FFF" }}>
               <button onClick={() => handleDelete(viewItem)} style={{ color: "#C55E5E", background: "none", border: "none", fontWeight: 600, cursor: "pointer" }}>Delete Document</button>
               <div style={{ display: "flex", gap: 12 }}>
-                {viewItem.status === "draft" && <Btn variant="primary" onClick={() => handleOptimize(viewItem)} disabled={optimizingId === viewItem.id}>{optimizingId === viewItem.id ? "Optimizing..." : "✨ Run AI Optimization"}</Btn>}
-                {viewItem.status === "review" && <Btn variant="primary" onClick={() => moveStatus(viewItem, "approved")}>Approve & Ready</Btn>}
-                <Btn variant="secondary" onClick={() => setViewItem(null)}>Close</Btn>
+                {isEditing ? (
+                  <>
+                    <Btn variant="secondary" onClick={() => { 
+                      setIsEditing(false); 
+                      const match = contentItems.find(i => i.id === viewItem.id);
+                      if (match) setViewItem(match);
+                    }}>Cancel</Btn>
+                    <Btn variant="primary" onClick={async () => {
+                      if (!viewItem) return;
+                      await upsertContent(viewItem);
+                      setContentItems(prev => prev.map(i => i.id === viewItem.id ? viewItem : i));
+                      setIsEditing(false);
+                      showToast("Changes saved!", "success");
+                      logActivity({ user: userName || "Unknown", action: "updated", entity: "document", entityName: viewItem.title, details: "Manually edited content" });
+                    }}>Save Changes</Btn>
+                  </>
+                ) : (
+                  <>
+                    <Btn variant="secondary" onClick={() => setIsEditing(true)}>Edit Content</Btn>
+                    {viewItem.status === "draft" && <Btn variant="primary" onClick={() => handleOptimize(viewItem)} disabled={optimizingId === viewItem.id}>{optimizingId === viewItem.id ? "Optimizing..." : "✨ Run AI Optimization"}</Btn>}
+                    {viewItem.status === "review" && <Btn variant="primary" onClick={() => moveStatus(viewItem, "approved")}>Approve & Ready</Btn>}
+                    <Btn variant="secondary" onClick={() => setViewItem(null)}>Close</Btn>
+                  </>
+                )}
               </div>
             </div>
           </div>

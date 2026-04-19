@@ -249,7 +249,7 @@ export default function App() {
       case "approvals":
         return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} clients={clients} users={users} />;
       case "publishing":
-        return <PublishingPage videos={videos} setVideos={setVideos} userName={user.name} clients={clients} users={users} />;
+        return <PublishingPage userName={user.name} />;
       case "editors":
         return <EditorsPage videos={videos} users={users} />;
       case "ads":

@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize server-side only
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(request: Request) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 });
+    }
+
+    const ai = new GoogleGenAI({ 
+      apiKey: apiKey,
+      vertexai: false 
+    });
+
     const body = await request.json();
     const { prompt, model, contentItem } = body;
 

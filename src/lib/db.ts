@@ -8,6 +8,7 @@ import {
   AdCampaign,
   KBDoc,
   Attachment,
+  ContentPipeline,
 } from "./types";
 import { AppUser } from "./auth";
 import { ActivityEntry } from "./activityLog";
@@ -373,6 +374,33 @@ export async function deleteKBDoc(id: string): Promise<void> {
     const { error } = await supabase.from("kb_docs").delete().eq("id", id);
     if (error) dbError("deleteKBDoc error:", error);
   } catch (err) { dbError("deleteKBDoc exception:", err); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONTENT PIPELINE
+   ═══════════════════════════════════════════════════════ */
+
+export async function fetchContent(): Promise<ContentPipeline[]> {
+  try {
+    const { data, error } = await supabase.from("content_pipeline").select("*").order("created_at", { ascending: false });
+    if (error) { dbError("fetchContent error:", error); return []; }
+    return (data || []).map((row) => toCamelCase(row as Record<string, unknown>) as unknown as ContentPipeline);
+  } catch (err) { dbError("fetchContent exception:", err); return []; }
+}
+
+export async function upsertContent(content: ContentPipeline): Promise<void> {
+  try {
+    const row = toSnakeCase(content as unknown as Record<string, unknown>);
+    const { error } = await supabase.from("content_pipeline").upsert(row, { onConflict: "id" });
+    if (error) dbError("upsertContent error:", error);
+  } catch (err) { dbError("upsertContent exception:", err); }
+}
+
+export async function deleteContent(id: string): Promise<void> {
+  try {
+    const { error } = await supabase.from("content_pipeline").delete().eq("id", id);
+    if (error) dbError("deleteContent error:", error);
+  } catch (err) { dbError("deleteContent exception:", err); }
 }
 
 /* ═══════════════════════════════════════════════════════

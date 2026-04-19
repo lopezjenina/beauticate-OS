@@ -127,3 +127,15 @@ export type KBDoc = {
   attachments?: Attachment[];
 };
 
+export type ContentPipeline = {
+  id: string;
+  title: string;
+  type: string;
+  rawDraft?: string;
+  optimizedContent?: string;
+  status: "draft" | "optimized" | "staged" | "pending_approval" | "approved" | "published";
+  feedback?: string;
+  scheduledDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};

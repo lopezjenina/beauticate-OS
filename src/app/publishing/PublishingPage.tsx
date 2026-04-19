@@ -1,721 +1,203 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Video, Client } from "@/lib/types";
-import { AppUser } from "@/lib/auth";
-import { PageHeader, Badge, Btn, Avatar, Stat, showToast } from "@/components/ui";
+import React, { useEffect, useState } from "react";
+import { PageHeader, Badge, Btn, Avatar, showToast } from "@/components/ui";
 import { logActivity } from "@/lib/activityLog";
-import { updateVideoField, upsertVideo } from "@/lib/db";
+import { ContentPipeline, fetchContent, upsertContent, deleteContent } from "@/lib/db";
 
 interface Props {
-  videos: Video[];
-  setVideos: (fn: (prev: Video[]) => Video[]) => void;
   userName?: string;
-  clients?: Client[];
-  users?: AppUser[];
+  // Kept for backward compatibility with page.tsx
+  videos?: any[];
+  setVideos?: any;
+  clients?: any[];
+  users?: any[];
 }
 
-export default function PublishingPage({ videos, setVideos, userName, clients = [], users = [] }: Props) {
-  const today = new Date("2026-03-30");
-  const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+const COLUMNS = [
+  { id: "draft", label: "Drafts" },
+  { id: "optimized", label: "AI Optimized" },
+  { id: "staged", label: "Staged (WP/GHL)" },
+  { id: "pending_approval", label: "Pending Review" },
+  { id: "approved", label: "Approved" },
+  { id: "published", label: "Published" },
+];
 
-  const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(
-    new Set([1, 2, 3, 4])
-  );
+export default function PublishingPage({ userName }: Props) {
+  const [contentItems, setContentItems] = useState<ContentPipeline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Partial<ContentPipeline> | null>(null);
 
-  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-  const [noteModalVideoId, setNoteModalVideoId] = useState<string | null>(null);
-  const [noteText, setNoteText] = useState("");
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const publishingVideos = videos.filter(
-    (v) => v.editingStatus === "approved"
-  );
-
-  const getClientName = (clientId: string) =>
-    clients.find((c) => c.id === clientId)?.name || "Unknown";
-
-  const getEditorName = (editorId: string) =>
-    users.find((u) => u.id === editorId)?.username || "Unknown";
-
-  const getEditorInitials = (editorId: string) => {
-    const name = users.find((u) => u.id === editorId)?.username || "?";
-    return name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const loadData = async () => {
+    const data = await fetchContent();
+    setContentItems(data);
+    setLoading(false);
   };
 
-  const getWeekNumber = (dateStr: string): number => {
-    const date = new Date(dateStr);
-    const weekStart = new Date("2026-03-30");
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    let week = 1;
-    while (date >= new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-      weekStart.setDate(weekStart.getDate() + 7);
-      week++;
-    }
-    return week;
-  };
+  const handleSave = async () => {
+    if (!editingItem?.title || !editingItem?.type) return showToast("Title and type are required", "error");
+    
+    const isNew = !editingItem.id;
+    const payload: ContentPipeline = {
+      id: editingItem.id || `content-${Date.now()}`,
+      title: editingItem.title,
+      type: editingItem.type,
+      rawDraft: editingItem.rawDraft || "",
+      optimizedContent: editingItem.optimizedContent || "",
+      status: editingItem.status || "draft",
+      feedback: editingItem.feedback || "",
+      scheduledDate: editingItem.scheduledDate || "",
+    };
 
-  const groupedByWeek = useMemo(() => {
-    const groups: Record<number, Video[]> = { 1: [], 2: [], 3: [], 4: [] };
-    publishingVideos.forEach((video) => {
-      const week = getWeekNumber(video.scheduledDate || today.toISOString());
-      if (week in groups) {
-        groups[week].push(video);
-      } else {
-        groups[week] = [video];
-      }
+    await upsertContent(payload);
+    await loadData();
+    setModalOpen(false);
+    setEditingItem(null);
+    showToast(`Content ${isNew ? "created" : "updated"} successfully!`, "success");
+    logActivity({
+      user: userName || "Unknown",
+      action: isNew ? "created" : "updated",
+      entity: "document",
+      entityName: payload.title,
+      details: isNew ? "Added new content draft" : "Updated content details",
     });
-    return groups;
-  }, [publishingVideos]);
-
-  const stats = useMemo(() => {
-    const totalInQueue = publishingVideos.length;
-    const captionsDone = publishingVideos.filter(
-      (v) => v.captionWritten
-    ).length;
-    const thumbnailsDone = publishingVideos.filter(
-      (v) => v.thumbnailDone
-    ).length;
-    const scheduled = publishingVideos.filter(
-      (v) => v.postingStatus === "scheduled"
-    ).length;
-
-    const thisWeekStart = new Date(today);
-    thisWeekStart.setDate(today.getDate() - today.getDay());
-    const thisWeekEnd = new Date(thisWeekStart);
-    thisWeekEnd.setDate(thisWeekStart.getDate() + 6);
-
-    const postedThisWeek = publishingVideos.filter((v) => {
-      if (v.postingStatus !== "posted" || !v.scheduledDate) return false;
-      const schedDate = new Date(v.scheduledDate);
-      return schedDate >= thisWeekStart && schedDate <= thisWeekEnd;
-    }).length;
-
-    return { totalInQueue, captionsDone, thumbnailsDone, scheduled, postedThisWeek };
-  }, [publishingVideos]);
-
-  const updateVideo = (videoId: string, updates: Partial<Video>) => {
-    setVideos((prev) =>
-      prev.map((v) => (v.id === videoId ? { ...v, ...updates } : v))
-    );
   };
 
-  const toggleCaption = (videoId: string) => {
-    const video = videos.find((v) => v.id === videoId);
-    if (video) {
-      updateVideo(videoId, { captionWritten: !video.captionWritten });
-      updateVideoField(videoId, "captionWritten", !video.captionWritten);
-      logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Caption marked ${!video.captionWritten ? "done" : "pending"}` });
+  const handleDelete = async (id: string, title: string) => {
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      await deleteContent(id);
+      await loadData();
+      showToast("Content deleted", "success");
+      logActivity({ user: userName || "Unknown", action: "deleted", entity: "document", entityName: title });
     }
   };
 
-  const toggleThumbnail = (videoId: string) => {
-    const video = videos.find((v) => v.id === videoId);
-    if (video) {
-      updateVideo(videoId, { thumbnailDone: !video.thumbnailDone });
-      updateVideoField(videoId, "thumbnailDone", !video.thumbnailDone);
-      logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Thumbnail marked ${!video.thumbnailDone ? "done" : "pending"}` });
+  const advanceStatus = async (item: ContentPipeline, newStatus: ContentPipeline["status"]) => {
+    const updated = { ...item, status: newStatus };
+    await upsertContent(updated);
+    await loadData();
+    showToast(`Moved to ${newStatus}`, "info");
+    logActivity({ user: userName || "Unknown", action: "moved", entity: "document", entityName: item.title, details: `Status changed to ${newStatus}` });
+    
+    // Simulate AI Generation delay if moved to optimized
+    if (newStatus === "optimized" && !item.optimizedContent) {
+      showToast("AI Optimization in progress...", "info");
+      setTimeout(async () => {
+        const aiSimulated = { 
+          ...updated, 
+          optimizedContent: `[AI GENERATED OPTIMIZATION]\n\n${item.rawDraft}\n\n(Note: This is a placeholder until OpenAI is connected!)` 
+        };
+        await upsertContent(aiSimulated);
+        await loadData();
+        showToast("AI Optimization complete!", "success");
+        logActivity({ user: "System AI", action: "updated", entity: "document", entityName: item.title, details: "Generated optimized content" });
+      }, 2500);
     }
-  };
-
-  const setScheduledDate = (videoId: string, dateStr: string) => {
-    const video = videos.find((v) => v.id === videoId);
-    updateVideo(videoId, { scheduledDate: dateStr });
-    updateVideoField(videoId, "scheduledDate", dateStr);
-    if (video) logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Scheduled date set to ${dateStr}` });
-  };
-
-  const setPostingStatus = (
-    videoId: string,
-    status: "pending" | "scheduled" | "posted"
-  ) => {
-    const video = videos.find((v) => v.id === videoId);
-    updateVideo(videoId, { postingStatus: status });
-    updateVideoField(videoId, "postingStatus", status);
-    if (video) logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `Posting status → ${status}` });
-    if (status === "posted") showToast(`"${video?.title || "Video"}" marked as posted`, "success");
-    else if (status === "scheduled") showToast(`"${video?.title || "Video"}" scheduled`, "info");
-  };
-
-  const toggleWeekExpanded = (week: number) => {
-    const next = new Set(expandedWeeks);
-    if (next.has(week)) next.delete(week);
-    else next.add(week);
-    setExpandedWeeks(next);
-  };
-
-  const statusColor = (status: string) => {
-    switch (status) {
-      case "posted":
-        return { bg: "#E6F4EA", text: "#1E7E34", border: "#A3D9A5" };
-      case "scheduled":
-        return { bg: "#E8F0FE", text: "#1A73E8", border: "#A8C7FA" };
-      default:
-        return { bg: "#F7F7F5", text: "#6B6B6B", border: "#E3E3E0" };
-    }
-  };
-
-  const PLATFORMS = ["Instagram", "TikTok", "Facebook", "YouTube"];
-
-  const platformColor = (platform: string) => {
-    switch (platform) {
-      case "Instagram": return "#E1306C";
-      case "TikTok": return "#010101";
-      case "Facebook": return "#1877F2";
-      case "YouTube": return "#FF0000";
-      default: return "#6B6B6B";
-    }
-  };
-
-  const handleVideoUpdate = (videoId: string, field: string, value: any) => {
-    setVideos((prev) =>
-      prev.map((v) => (v.id === videoId ? { ...v, [field]: value } : v))
-    );
-    updateVideoField(videoId, field, value);
   };
 
   return (
-    <div
-      style={{
-        padding: "0 40px 60px",
-        background: "#FFFFFF",
-        minHeight: "100vh",
-      }}
-    >
-      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <PageHeader
-          title="Content Publishing"
-          subtitle="Pipeline: Production → Distribution"
-        />
-
-        {/* Stats Bar */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: 20,
-            marginBottom: 40,
-          }}
-        >
-          <div style={{ background: "#F7F7F5", padding: 20, borderRadius: 8 }}>
-            <Stat
-              label="Total in Queue"
-              value={stats.totalInQueue}
-              sub="approved videos"
-            />
-          </div>
-          <div style={{ background: "#F7F7F5", padding: 20, borderRadius: 8 }}>
-            <Stat
-              label="Captions Done"
-              value={stats.captionsDone}
-              sub={`of ${stats.totalInQueue}`}
-            />
-          </div>
-          <div style={{ background: "#F7F7F5", padding: 20, borderRadius: 8 }}>
-            <Stat
-              label="Thumbnails Done"
-              value={stats.thumbnailsDone}
-              sub={`of ${stats.totalInQueue}`}
-            />
-          </div>
-          <div style={{ background: "#F7F7F5", padding: 20, borderRadius: 8 }}>
-            <Stat
-              label="Scheduled"
-              value={stats.scheduled}
-              sub="ready to post"
-            />
-          </div>
-          <div style={{ background: "#F7F7F5", padding: 20, borderRadius: 8 }}>
-            <Stat
-              label="Posted This Week"
-              value={stats.postedThisWeek}
-              sub="live content"
-            />
-          </div>
+    <div style={{ padding: "0 40px 60px", background: "#FFFFFF", minHeight: "100vh" }}>
+      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
+          <PageHeader title="Content Engine" subtitle="Automated Publishing Pipeline" />
+          <Btn variant="primary" onClick={() => { setEditingItem({ type: "Blog", status: "draft" }); setModalOpen(true); }}>
+            + New Draft
+          </Btn>
         </div>
 
-        {/* Week Sections */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {[1, 2, 3, 4].map((week) => {
-            const weekVideos = groupedByWeek[week] || [];
-            const isExpanded = expandedWeeks.has(week);
-            const weekPosted = weekVideos.filter(
-              (v) => v.postingStatus === "posted"
-            ).length;
-
+        <div style={{ display: "flex", gap: 20, overflowX: "auto", paddingBottom: 20 }}>
+          {COLUMNS.map(col => {
+            const items = contentItems.filter(i => i.status === col.id);
             return (
-              <div
-                key={week}
-                style={{
-                  backgroundColor: "#FFFFFF",
-                  border: "1px solid #E3E3E0",
-                  borderRadius: 8,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Week Header */}
-                <div
-                  onClick={() => toggleWeekExpanded(week)}
-                  style={{
-                    padding: "16px 24px",
-                    cursor: "pointer",
-                    backgroundColor: "#F7F7F5",
-                    borderBottom: isExpanded ? "1px solid #E3E3E0" : "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    userSelect: "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 600,
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      Week {week}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "#9B9B9B",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {weekVideos.length} video
-                      {weekVideos.length !== 1 ? "s" : ""}
-                    </span>
-                    {weekPosted > 0 && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#1E7E34",
-                          background: "#E6F4EA",
-                          padding: "2px 8px",
-                          borderRadius: 10,
-                        }}
-                      >
-                        {weekPosted} posted
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 18,
-                      color: "#6B6B6B",
-                      transition: "transform 0.2s",
-                      transform: isExpanded
-                        ? "rotate(180deg)"
-                        : "rotate(0deg)",
-                    }}
-                  >
-                    ▼
-                  </span>
+              <div key={col.id} style={{ flex: "0 0 320px", background: "#F7F7F5", borderRadius: 12, padding: 16, border: "1px solid #E3E3E0" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                  {col.label}
+                  <span style={{ color: "#9B9B9B", background: "#EBEBEA", padding: "2px 8px", borderRadius: 10, fontSize: 11 }}>{items.length}</span>
                 </div>
-
-                {/* Table Content */}
-                {isExpanded && (
-                  <div style={{ overflowX: "auto" }}>
-                    {weekVideos.length === 0 ? (
-                      <div
-                        style={{
-                          padding: 32,
-                          textAlign: "center",
-                          color: "#9B9B9B",
-                          fontSize: 13,
-                        }}
-                      >
-                        No videos scheduled for this week.
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 200 }}>
+                  {items.map(item => (
+                    <div key={item.id} className="glass" style={{ background: "#FFFFFF", padding: 16, borderRadius: 8, border: "1px solid #E3E3E0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", cursor: "pointer" }} onClick={() => { setEditingItem(item); setModalOpen(true); }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#6B6B6B", textTransform: "uppercase" }}>{item.type}</span>
+                        {item.scheduledDate && <span style={{ fontSize: 10, color: "#4DAB9A", background: "#EAF5F2", padding: "2px 6px", borderRadius: 4 }}>{new Date(item.scheduledDate).toLocaleDateString()}</span>}
                       </div>
-                    ) : (
-                      <table
-                        style={{
-                          width: "100%",
-                          borderCollapse: "collapse",
-                          fontSize: 13,
-                        }}
-                      >
-                        <thead>
-                          <tr
-                            style={{
-                              borderBottom: "1px solid #E3E3E0",
-                              textAlign: "left",
-                            }}
-                          >
-                            {[
-                              "Video",
-                              "Platform",
-                              "Editor",
-                              "Caption",
-                              "Thumbnail",
-                              "Scheduled Date",
-                              "Status",
-                              "Notes",
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                style={{
-                                  padding: "10px 16px",
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: "#9B9B9B",
-                                  letterSpacing: "0.04em",
-                                  textTransform: "uppercase",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {weekVideos.map((video) => {
-                            const isPosted =
-                              video.postingStatus === "posted";
-                            const sc = statusColor(video.postingStatus);
-                            return (
-                              <React.Fragment key={video.id}>
-                              <tr
-                                onClick={() => setExpandedRowId(expandedRowId === video.id ? null : video.id)}
-                                style={{
-                                  borderBottom: "1px solid #F0F0EE",
-                                  backgroundColor: isPosted
-                                    ? "#F6FBF7"
-                                    : expandedRowId === video.id ? "#F0F0EE" : "transparent",
-                                  transition: "background-color 0.15s",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {/* Video Title + Client */}
-                                <td
-                                  style={{
-                                    padding: "14px 16px",
-                                    minWidth: 180,
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontWeight: 600,
-                                      color: "#1A1A1A",
-                                      fontSize: 13,
-                                      lineHeight: 1.3,
-                                    }}
-                                  >
-                                    {video.title || "Untitled Video"}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: 11,
-                                      color: "#9B9B9B",
-                                      marginTop: 2,
-                                    }}
-                                  >
-                                    {getClientName(video.clientId)}
-                                  </div>
-                                </td>
-
-                                {/* Platform Multi-Select Pills */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                                    {PLATFORMS.map(p => {
-                                      const isActive = (video.platform || "").split(",").map(s => s.trim()).includes(p);
-                                      return (
-                                        <button
-                                          key={p}
-                                          onClick={() => {
-                                            const current = (video.platform || "").split(",").map(s => s.trim()).filter(Boolean);
-                                            const updated = isActive ? current.filter(x => x !== p) : [...current, p];
-                                            handleVideoUpdate(video.id, "platform", updated.join(", "));
-                                            logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: video.title || "Untitled", details: `${isActive ? "Removed" : "Added"} platform ${p}` });
-                                          }}
-                                          style={{
-                                            padding: "2px 8px", borderRadius: 12, fontSize: 11, fontWeight: 500,
-                                            border: isActive ? "none" : "1px solid #E3E3E0",
-                                            background: isActive ? platformColor(p) + "18" : "transparent",
-                                            color: isActive ? platformColor(p) : "#9B9B9B",
-                                            cursor: "pointer", fontFamily: "inherit",
-                                          }}
-                                        >
-                                          {p}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </td>
-
-                                {/* Editor */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 6,
-                                    }}
-                                  >
-                                    <Avatar
-                                      initials={getEditorInitials(
-                                        video.editorId
-                                      )}
-                                      size={22}
-                                    />
-                                    <span
-                                      style={{
-                                        fontSize: 12,
-                                        color: "#6B6B6B",
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {getEditorName(video.editorId)}
-                                    </span>
-                                  </div>
-                                </td>
-
-                                {/* Caption Toggle */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <button
-                                    onClick={() => toggleCaption(video.id)}
-                                    style={{
-                                      padding: "4px 14px",
-                                      borderRadius: 20,
-                                      fontSize: 12,
-                                      fontWeight: 500,
-                                      border: "none",
-                                      background: video.captionWritten ? "#EAF5F2" : "#F7F7F5",
-                                      color: video.captionWritten ? "#4DAB9A" : "#9B9B9B",
-                                      cursor: "pointer",
-                                      fontFamily: "inherit",
-                                      whiteSpace: "nowrap" as const,
-                                    }}
-                                  >
-                                    {video.captionWritten ? "\u2713 Done" : "Pending"}
-                                  </button>
-                                </td>
-
-                                {/* Thumbnail Toggle */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <button
-                                    onClick={() => toggleThumbnail(video.id)}
-                                    style={{
-                                      padding: "4px 14px",
-                                      borderRadius: 20,
-                                      fontSize: 12,
-                                      fontWeight: 500,
-                                      border: "none",
-                                      background: video.thumbnailDone ? "#EAF5F2" : "#F7F7F5",
-                                      color: video.thumbnailDone ? "#4DAB9A" : "#9B9B9B",
-                                      cursor: "pointer",
-                                      fontFamily: "inherit",
-                                      whiteSpace: "nowrap" as const,
-                                    }}
-                                  >
-                                    {video.thumbnailDone ? "\u2713 Done" : "Pending"}
-                                  </button>
-                                </td>
-
-                                {/* Scheduled Date */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <input
-                                    type="date"
-                                    value={video.scheduledDate || ""}
-                                    onChange={(e) =>
-                                      setScheduledDate(
-                                        video.id,
-                                        e.target.value
-                                      )
-                                    }
-                                    style={{
-                                      padding: "5px 8px",
-                                      fontSize: 12,
-                                      border: "1px solid #E3E3E0",
-                                      borderRadius: 6,
-                                      fontFamily: "inherit",
-                                      color: "#1A1A1A",
-                                      background: "#FFFFFF",
-                                      outline: "none",
-                                      minWidth: 130,
-                                    }}
-                                  />
-                                </td>
-
-                                {/* Posting Status */}
-                                <td style={{ padding: "14px 16px" }}>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 8,
-                                    }}
-                                  >
-                                    <select
-                                      value={video.postingStatus}
-                                      onChange={(e) =>
-                                        setPostingStatus(
-                                          video.id,
-                                          e.target.value as
-                                            | "pending"
-                                            | "scheduled"
-                                            | "posted"
-                                        )
-                                      }
-                                      style={{
-                                        padding: "5px 8px",
-                                        fontSize: 12,
-                                        border: `1px solid ${sc.border}`,
-                                        borderRadius: 6,
-                                        fontFamily: "inherit",
-                                        color: sc.text,
-                                        backgroundColor: sc.bg,
-                                        outline: "none",
-                                        cursor: "pointer",
-                                        fontWeight: 500,
-                                      }}
-                                    >
-                                      <option value="pending">Pending</option>
-                                      <option value="scheduled">
-                                        Scheduled
-                                      </option>
-                                      <option value="posted">Posted</option>
-                                    </select>
-                                    {isPosted && (
-                                      <span
-                                        style={{
-                                          fontSize: 10,
-                                          fontWeight: 700,
-                                          color: "#1E7E34",
-                                          backgroundColor: "#E6F4EA",
-                                          padding: "3px 8px",
-                                          borderRadius: 10,
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        Posted
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-
-                                {/* Notes */}
-                                <td style={{ padding: "14px 16px", minWidth: 140 }}>
-                                  {(video.notes || []).length > 0 ? (
-                                    <span
-                                      onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(video.id); }}
-                                      style={{
-                                        fontSize: 12, fontWeight: 600, color: "#4DAB9A",
-                                        cursor: "pointer", padding: "3px 10px", borderRadius: 12,
-                                        background: "#EAF5F2", whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {video.notes.length} note{video.notes.length !== 1 ? "s" : ""}
-                                    </span>
-                                  ) : (
-                                    <span
-                                      onClick={(e) => { e.stopPropagation(); setNoteModalVideoId(video.id); }}
-                                      style={{
-                                        fontSize: 12, color: "#9B9B9B", cursor: "pointer",
-                                        fontWeight: 500,
-                                      }}
-                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#4DAB9A"; }}
-                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#9B9B9B"; }}
-                                    >
-                                      + Add note
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                              {/* Expandable History Row */}
-                              {expandedRowId === video.id && (
-                                <tr>
-                                  <td colSpan={8} style={{ padding: 0 }}>
-                                    <div style={{
-                                      background: "#F7F7F5", padding: "16px 24px",
-                                      borderTop: "1px solid #E3E3E0",
-                                    }}>
-                                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>History</div>
-                                      {(video.notes || []).length === 0 ? (
-                                        <div style={{ fontSize: 12, color: "#9B9B9B", padding: "8px 0" }}>No history entries yet.</div>
-                                      ) : (
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                          {video.notes.map((n, i) => {
-                                            const initials = n.from.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-                                            return (
-                                              <div key={i} className="glass" style={{
-                                                padding: "12px 16px", borderRadius: "12px",
-                                                border: "1px solid var(--border-light)",
-                                                background: "rgba(255,255,255,0.4)",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
-                                              }}>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                                                  <Avatar initials={initials} size={24} />
-                                                  <div style={{ display: "flex", flexDirection: "column" }}>
-                                                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{n.from}</span>
-                                                    <span style={{ fontSize: 10, color: "var(--text-ter)" }}>{new Date(n.date).toLocaleDateString()}</span>
-                                                  </div>
-                                                </div>
-                                                <div style={{ color: "var(--text-sec)", fontSize: 13, lineHeight: 1.5, paddingLeft: 34 }}>{n.text}</div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                              </React.Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, lineHeight: 1.3 }}>{item.title}</div>
+                      
+                      <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                        {item.status === "draft" && <button onClick={() => advanceStatus(item, "optimized")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Optimize with AI</button>}
+                        {item.status === "optimized" && <button onClick={() => advanceStatus(item, "staged")} style={{ flex: 1, padding: "6px", background: "#2383E2", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Mark as Staged</button>}
+                        {item.status === "staged" && <button onClick={() => advanceStatus(item, "pending_approval")} style={{ flex: 1, padding: "6px", background: "#CB7F2C", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Request Review</button>}
+                        {item.status === "pending_approval" && <button onClick={() => advanceStatus(item, "approved")} style={{ flex: 1, padding: "6px", background: "#4DAB9A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Approve</button>}
+                        {item.status === "approved" && <button onClick={() => advanceStatus(item, "published")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Publish</button>}
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 && <div style={{ textAlign: "center", color: "#9B9B9B", fontSize: 12, padding: "20px 0" }}>No items</div>}
+                </div>
               </div>
             );
           })}
         </div>
-
-        {/* Notes Modal */}
-        {noteModalVideoId && (() => {
-          const video = videos.find(v => v.id === noteModalVideoId);
-          if (!video) return null;
-          return (
-            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }} onClick={() => { setNoteModalVideoId(null); setNoteText(""); }}>
-              <div style={{ background: "#FFF", borderRadius: 12, width: 480, maxWidth: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
-                <div style={{ padding: "20px 24px", borderBottom: "1px solid #E3E3E0" }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Notes — {video.title}</h3>
+        
+        {/* Editor Modal */}
+        {modalOpen && editingItem && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "center" }} onClick={() => setModalOpen(false)}>
+            <div style={{ background: "#FFF", width: 900, height: "85vh", borderRadius: 16, display: "flex", flexDirection: "column", boxShadow: "0 24px 48px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: "20px 24px", borderBottom: "1px solid #EBEBEA", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ margin: 0, fontSize: 18 }}>{editingItem.id ? "Edit Content" : "New Content Draft"}</h2>
+                <button onClick={() => setModalOpen(false)} style={{ background: "transparent", border: "none", fontSize: 20, cursor: "pointer", color: "#9B9B9B" }}>&times;</button>
+              </div>
+              
+              <div style={{ flex: 1, overflow: "auto", padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6 }}>Title</label>
+                    <input type="text" value={editingItem.title || ""} onChange={e => setEditingItem({ ...editingItem, title: e.target.value })} style={{ width: "100%", padding: 10, border: "1px solid #E3E3E0", borderRadius: 6, fontSize: 14 }} placeholder="e.g. 5 Fall Styling Tips" />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6 }}>Content Type</label>
+                    <select value={editingItem.type || "Blog"} onChange={e => setEditingItem({ ...editingItem, type: e.target.value })} style={{ width: "100%", padding: 10, border: "1px solid #E3E3E0", borderRadius: 6, fontSize: 14 }}>
+                      <option>Blog Post</option>
+                      <option>EDM / Newsletter</option>
+                      <option>Social Caption</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6 }}>Raw Draft / Instructions</label>
+                    <textarea value={editingItem.rawDraft || ""} onChange={e => setEditingItem({ ...editingItem, rawDraft: e.target.value })} style={{ flex: 1, width: "100%", padding: 10, border: "1px solid #E3E3E0", borderRadius: 6, fontSize: 14, resize: "none" }} placeholder="Paste the rough draft here..." />
+                  </div>
                 </div>
-                <div style={{ flex: 1, overflow: "auto", padding: "16px 24px" }}>
-                  {(video.notes || []).length === 0 ? (
-                    <div style={{ textAlign: "center", color: "#9B9B9B", padding: "24px 0", fontSize: 13 }}>No notes yet</div>
-                  ) : (
-                    video.notes.map((n, i) => (
-                      <div key={i} style={{ padding: "10px 0", borderBottom: i < video.notes.length - 1 ? "1px solid #EBEBEA" : "none" }}>
-                        <div style={{ fontSize: 11, color: "#9B9B9B", marginBottom: 4 }}>{new Date(n.date).toLocaleDateString()} — {n.from}</div>
-                        <div style={{ fontSize: 13, color: "#1A1A1A" }}>{n.text}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <div style={{ padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
-                  <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} style={{ width: "100%", padding: "10px 12px", border: "1px solid #E3E3E0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-                    <button onClick={() => { setNoteModalVideoId(null); setNoteText(""); }} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "transparent", color: "#6B6B6B", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                    <button onClick={() => { if (!noteText.trim()) return; const vid = videos.find(v => v.id === noteModalVideoId); const newNotes = [...(vid?.notes || []), { from: userName || "Publishing", date: new Date().toISOString(), text: noteText.trim() }]; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: newNotes } : v)); if (vid) upsertVideo({ ...vid, notes: newNotes }); logActivity({ user: userName || "Unknown", action: "updated", entity: "video", entityName: vid?.title || "Untitled", details: "Added publishing note" }); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: 16, background: "#F7F7F5", padding: 16, borderRadius: 8 }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6 }}>AI Optimized Content</label>
+                    <textarea value={editingItem.optimizedContent || ""} onChange={e => setEditingItem({ ...editingItem, optimizedContent: e.target.value })} style={{ flex: 1, width: "100%", padding: 10, border: "1px solid #E3E3E0", borderRadius: 6, fontSize: 14, resize: "none", background: "#FFF" }} placeholder="Optimized result will appear here. You can manually edit it." />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#6B6B6B", marginBottom: 6 }}>Feedback / Notes</label>
+                    <textarea value={editingItem.feedback || ""} onChange={e => setEditingItem({ ...editingItem, feedback: e.target.value })} style={{ width: "100%", padding: 10, border: "1px solid #E3E3E0", borderRadius: 6, fontSize: 14, height: 80, resize: "none", background: "#FFF" }} placeholder="Sigourney can leave revision notes here..." />
                   </div>
                 </div>
               </div>
+              
+              <div style={{ padding: "16px 24px", borderTop: "1px solid #EBEBEA", display: "flex", justifyContent: "space-between", background: "#FDFDFD", borderRadius: "0 0 16px 16px" }}>
+                {editingItem.id ? (
+                  <button onClick={() => handleDelete(editingItem.id!, editingItem.title || "Untitled")} style={{ padding: "8px 16px", color: "#EB5757", background: "transparent", border: "1px solid #FADADA", borderRadius: 6, cursor: "pointer", fontWeight: 500 }}>Delete Draft</button>
+                ) : <div/>}
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button onClick={() => setModalOpen(false)} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "#FFF", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={handleSave} style={{ padding: "8px 24px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", cursor: "pointer", fontWeight: 600 }}>Save Content</button>
+                </div>
+              </div>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     </div>
   );

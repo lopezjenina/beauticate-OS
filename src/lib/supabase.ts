@@ -17,7 +17,14 @@ let _client: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
   if (!_client) {
-    _client = createBrowserClient(supabaseUrl, supabaseAnonKey);
+    _client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      cookieOptions: {
+        name: "beauticate-auth-token",
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      },
+    });
   }
   return _client;
 }

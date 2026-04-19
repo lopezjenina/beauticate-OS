@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const createClient = (request: NextRequest) => {
     // Create an unmodified response
@@ -16,6 +16,12 @@ export const createClient = (request: NextRequest) => {
         supabaseUrl!,
         supabaseKey!,
         {
+            cookieOptions: {
+                name: "beauticate-auth-token",
+                path: "/",
+                sameSite: "lax",
+                secure: process.env.NODE_ENV === "production",
+            },
             cookies: {
                 getAll() {
                     return request.cookies.getAll()

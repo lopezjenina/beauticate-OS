@@ -1,21 +1,30 @@
 import { GoogleGenAI } from '@google/genai';
 
 /**
- * Server-side Gemini AI client.
- * Only import this in API routes / server components — never from client code.
- * The GEMINI_API_KEY environment variable must be set (without NEXT_PUBLIC_ prefix
- * so it stays server-only).
+ * Server-side Gemini AI client helper.
+ * This is a lazy-loading wrapper to ensure environment variables are available
+ * and to prevent "Could not load default credentials" errors during module load.
  */
-export const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getAiClient() {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is not configured');
+  }
+  return new GoogleGenAI({ 
+    apiKey, 
+    vertexai: false 
+  });
+}
 
 /**
  * Utility function to generate content using Gemini
  * @param prompt The text prompt to send to the model
- * @param model The model to use, defaults to gemini-2.5-flash
+ * @param model The model to use, defaults to gemini-1.5-flash
  * @returns The generated text
  */
-export async function generateContent(prompt: string, model: string = 'gemini-2.5-flash') {
+export async function generateContent(prompt: string, model: string = 'gemini-1.5-flash') {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,

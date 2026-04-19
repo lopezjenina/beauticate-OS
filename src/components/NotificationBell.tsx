@@ -57,7 +57,12 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
   useEffect(() => {
     if (showDropdown && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownPos({ top: rect.top, left: rect.right + 8 });
+      let calcTop = rect.top;
+      const spaceBelow = window.innerHeight - rect.top;
+      if (spaceBelow < 400) {
+        calcTop = Math.max(20, window.innerHeight - 420);
+      }
+      setDropdownPos({ top: calcTop, left: rect.right + 8 });
     }
   }, [showDropdown]);
 

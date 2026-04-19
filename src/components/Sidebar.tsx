@@ -11,15 +11,15 @@ type NavItem = { id: string; label: string; group?: string };
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", group: "overview" },
   { id: "calendar", label: "Calendar", group: "overview" },
-  { id: "sales", label: "Sales", group: "pipeline" },
-  { id: "onboarding", label: "Onboarding", group: "pipeline" },
+  // { id: "sales", label: "Sales", group: "pipeline" },
+  // { id: "onboarding", label: "Onboarding", group: "pipeline" },
   { id: "clients", label: "Clients", group: "pipeline" },
-  { id: "production", label: "Production", group: "operations" },
+  { id: "publishing", label: "Content Engine", group: "operations" }, // Formerly Publishing
+  { id: "production", label: "Creative Studio", group: "operations" }, // Formerly Production
   { id: "approvals", label: "Approvals", group: "operations" },
-  { id: "publishing", label: "Publishing", group: "operations" },
-  { id: "editors", label: "Editors", group: "team" },
-  { id: "ads", label: "Ads", group: "team" },
-  { id: "packages", label: "Packages", group: "resources" },
+  // { id: "editors", label: "Editors", group: "team" },
+  // { id: "ads", label: "Ads", group: "team" },
+  // { id: "packages", label: "Packages", group: "resources" },
   { id: "knowledge", label: "Knowledge Base", group: "resources" },
   { id: "activity", label: "Activity Log", group: "resources" },
 ];
@@ -106,7 +106,8 @@ export function Sidebar({
         position: "sticky",
         top: 0,
         transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        overflow: "hidden",
+        overflowY: "auto",
+        overflowX: "hidden",
         zIndex: 100,
       }}
     >

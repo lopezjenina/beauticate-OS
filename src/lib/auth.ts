@@ -126,38 +126,59 @@ async function getOrCreateProfile(userId: string, email: string): Promise<AppUse
     return profileFromRow(profile);
   }
 
-  // Profile doesn't exist yet (trigger may not have run) — create it now
-  const defaultUsername = email.split("@")[0];
-  const defaultPermissions = Object.fromEntries(ALL_PAGES.map((p) => [p, true]));
-
-  const { data: newProfile, error: insertError } = await supabase
-    .from("profiles")
-    .upsert(
-      {
-        id: userId,
-        email,
-        username: defaultUsername,
-        role: "member",
-        permissions: defaultPermissions,
-      },
-      { onConflict: "id" }
-    )
-    .select()
-    .single();
-
-  if (insertError || !newProfile) {
-    console.error("Failed to create profile:", insertError);
-    // Return a minimal user so they aren't stuck on the login screen
+  // If error is NOT "row not found" (PGRST116), the profile likely exists but
+  // RLS blocked the read — DO NOT overwrite it with a default role.
+  if (error && error.code !== "PGRST116") {
+    console.error("Profile fetch blocked (possible RLS issue):", error.message);
+    // Return a minimal stand-in so auth doesn't hard-fail, but don't upsert.
     return {
       id: userId,
       email,
-      username: defaultUsername,
+      username: email.split("@")[0],
       role: "member",
       permissions: Object.fromEntries(ALL_PAGES.map((p) => [p, true])),
     };
   }
 
-  return profileFromRow(newProfile);
+  // Profile truly doesn't exist yet (trigger may not have fired) — INSERT only.
+  // Use ignoreDuplicates: true so we NEVER overwrite an existing row's role.
+  const defaultUsername = email.split("@")[0];
+  const defaultPermissions = Object.fromEntries(ALL_PAGES.map((p) => [p, true]));
+
+  const { error: insertError } = await supabase
+    .from("profiles")
+    .insert({
+      id: userId,
+      email,
+      username: defaultUsername,
+      role: "member",
+      permissions: defaultPermissions,
+    });
+
+  if (insertError && insertError.code !== "23505") {
+    // 23505 = unique violation (row already exists — safe to ignore)
+    console.error("Failed to create profile:", insertError);
+  }
+
+  // Re-fetch the profile (whether we just inserted or it already existed)
+  const { data: finalProfile, error: refetchError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (refetchError || !finalProfile) {
+    console.error("Could not fetch profile after insert:", refetchError);
+    return {
+      id: userId,
+      email,
+      username: defaultUsername,
+      role: "member",
+      permissions: defaultPermissions,
+    };
+  }
+
+  return profileFromRow(finalProfile);
 }
 
 /* ─── Internal helper ─── */

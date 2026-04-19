@@ -1,35 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 function AuthErrorContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const errorCode = searchParams.get("error_code");
-  const isExpired = errorCode === "otp_expired" || errorCode === "401";
-  const [isRecovering, setIsRecovering] = useState(false);
+  const errorCode = searchParams.get("error_code") ?? "";
 
-  useEffect(() => {
-    // Recover implicit flow token from hash if available
-    if (window.location.hash.includes("access_token=")) {
-      setIsRecovering(true);
-      supabase.auth.getSession().then(() => {
-        router.replace("/");
-      });
-    }
-  }, [router]);
+  // Map Supabase / custom error codes to user-friendly messages
+  const isExpired =
+    errorCode === "otp_expired" ||
+    errorCode === "401" ||
+    errorCode.includes("expired");
 
-  if (isRecovering) {
-    return (
-      <div style={{ textAlign: "center", color: "#6B6B6B" }}>
-        <div style={{ fontSize: 24, marginBottom: 16 }}></div>
-        <h1 style={{ fontSize: 20, color: "#1A1A1A", marginBottom: 8 }}>Authenticating...</h1>
-        <p>Please wait a moment.</p>
-      </div>
-    );
+  const isInvalid =
+    errorCode === "invalid_grant" ||
+    errorCode.includes("invalid");
+
+  let heading = "Authentication Failed";
+  let body = "Something went wrong during authentication. Please try again.";
+
+  if (isExpired) {
+    heading = "Link Expired";
+    body = "Your magic link has expired. Links are only valid for 10 minutes. Request a new one to sign in.";
+  } else if (isInvalid) {
+    heading = "Link Already Used";
+    body = "This magic link has already been used or is no longer valid. Request a new one to sign in.";
   }
 
   return (
@@ -57,21 +54,24 @@ function AuthErrorContent() {
           background: "rgba(255, 59, 48, 0.1)",
           border: "1px solid rgba(255, 59, 48, 0.2)",
           display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 28,
         }}
       >
-        <div style={{ fontSize: 40, marginBottom: 16 }}>
-        </div>
+        ✕
       </div>
 
       <div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
-          {isExpired ? "Link Expired" : "Authentication Failed"}
+          {heading}
         </h1>
         <p style={{ fontSize: 14, color: "#6B6B6B", margin: 0, lineHeight: 1.6 }}>
-          {isExpired
-            ? "Your magic link has expired. Links are only valid for 10 minutes. Request a new one to sign in."
-            : "Something went wrong during authentication. Please try again."}
+          {body}
         </p>
+        {errorCode && (
+          <p style={{ fontSize: 11, color: "#B0B0B0", marginTop: 8 }}>
+            Error: {errorCode}
+          </p>
+        )}
       </div>
 
       <Link

@@ -244,7 +244,10 @@ export default function PublishingPage({ userName }: { userName?: string }) {
         body: JSON.stringify({ contentItem: item }),
       });
 
-      if (!res.ok) throw new Error("Optimization failed");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Optimization failed");
+      }
       const { result } = await res.json();
 
       const updated = { ...item, optimizedContent: result, status: "optimized" as const };
@@ -254,9 +257,10 @@ export default function PublishingPage({ userName }: { userName?: string }) {
       if (viewItem?.id === item.id) setViewItem(updated);
       
       await upsertContent(updated);
-      showToast("Optimized with OpenRouter Llama 3!", "success");
+      showToast("Optimized with AI Engine!", "success");
       logActivity({ user: "AI Engine", action: "updated", entity: "document", entityName: item.title, details: "AI Optimization complete" });
     } catch (err: any) {
+      console.error("Optimization error:", err);
       showToast(err.message, "error");
     } finally {
       setOptimizingId(null);

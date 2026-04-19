@@ -133,8 +133,11 @@ export type ContentPipeline = {
   type: string;
   rawDraft?: string;
   optimizedContent?: string;
-  status: "draft" | "optimized" | "staged" | "pending_approval" | "approved" | "published";
+  status: "draft" | "optimized" | "review" | "revision" | "approved" | "scheduled" | "published";
   feedback?: string;
+  links?: string;
+  notes?: string;
+  createdBy?: string;
   scheduledDate?: string;
   createdAt?: string;
   updatedAt?: string;

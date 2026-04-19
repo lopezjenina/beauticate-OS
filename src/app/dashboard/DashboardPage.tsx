@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Client, Video, Lead, AdCampaign } from "@/lib/types";
-import { ContentPipeline } from "@/lib/db";
+import { ContentPipeline } from "@/lib/types";
 import { WEEKLY_TARGET } from "@/lib/store";
 import { AppUser } from "@/lib/auth";
 import { Avatar, Badge, Btn, Stat, PageHeader, ProgressBar, EmptyState } from "@/components/ui";
@@ -86,7 +86,7 @@ export default function DashboardPage({
   );
 
   const pendingApprovals = useMemo(
-    () => contents.filter((c) => c.status === "pending_approval").length,
+    () => contents.filter((c) => c.status === "review").length,
     [contents]
   );
 
@@ -150,13 +150,14 @@ export default function DashboardPage({
 
   // ─── Content Pipeline Chart Data ───
   const contentPipelineData = useMemo(() => {
-    const statuses = ["draft", "optimized", "staged", "pending_approval", "approved", "published"] as const;
+    const statuses = ["draft", "optimized", "review", "revision", "approved", "scheduled", "published"] as const;
     const labels: Record<string, string> = {
-      draft: "Drafts",
-      optimized: "AI Optimized",
-      staged: "Staged",
-      pending_approval: "Reviewing",
+      draft: "For Optimization",
+      optimized: "Optimized",
+      review: "For Review",
+      revision: "Needs Revision",
       approved: "Approved",
+      scheduled: "Scheduled",
       published: "Published",
     };
     return statuses.map((s) => ({

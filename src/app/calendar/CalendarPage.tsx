@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Badge, Btn, PageHeader } from '@/components/ui';
-import { fetchContent, ContentPipeline } from '@/lib/db';
+import { fetchContent } from '@/lib/db';
+import { ContentPipeline } from '@/lib/types';
 
 export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -33,8 +34,8 @@ export default function CalendarPage() {
           if (!map[day]) map[day] = [];
           let color = "#1A1A1A"; // default
           if (c.status === "published") color = "#4DAB9A";
-          else if (c.status === "staged" || c.status === "pending_approval") color = "#CB7F2C";
-          else if (c.status === "approved") color = "#2383E2";
+          else if (c.status === "review" || c.status === "revision") color = "#CB7F2C";
+          else if (c.status === "approved" || c.status === "scheduled") color = "#2383E2";
 
           map[day].push({ title: c.title, type: c.type, status: c.status, color });
         }

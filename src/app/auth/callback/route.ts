@@ -37,5 +37,6 @@ export async function GET(request: NextRequest) {
   }
 
   // Auth error — redirect to the error page
-  return NextResponse.redirect(`${origin}/auth/error`);
+  // If we had an error from exchangeCodeForSession, we can pass it along
+  return NextResponse.redirect(`${origin}/auth/error?error_code=401`);
 }

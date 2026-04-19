@@ -229,7 +229,7 @@ export default function App() {
       case "dashboard":
         return <DashboardPage clients={clients} videos={videos} leads={leads} ads={ads} users={users} />;
       case "calendar":
-        return <CalendarPage clients={clients} videos={videos} users={users} />;
+        return <CalendarPage />;
       case "sales":
         return <SalesPage leads={leads} setLeads={setLeads} onClosedWon={handleClosedWon} canDelete={canDelete} />;
       case "onboarding":

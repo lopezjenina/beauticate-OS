@@ -12,6 +12,7 @@ interface ProductionPageProps {
   setVideos: (fn: (prev: Video[]) => Video[]) => void;
   canDelete?: boolean;
   users?: AppUser[];
+  currentUser?: { name: string; email: string; role: string } | null;
 }
 
 type EditingStatus = 'Not Started' | 'Editing' | 'Delivered' | 'Revision' | 'Approved';
@@ -55,6 +56,7 @@ export default function ProductionPage({
   setVideos,
   canDelete,
   users = [],
+  currentUser,
 }: ProductionPageProps) {
   const editorList = users.filter(u => u.role === "editor" || u.role === "videographer").map(e => ({ id: e.id, name: e.username }));
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set([1, 2, 3, 4]));
@@ -595,14 +597,16 @@ export default function ProductionPage({
                                             <Badge variant={getStatusBadgeVariant((video.editingStatus || "not_started") as EditingStatus)}>{video.editingStatus}</Badge>
                                           </div>
                                           
-                                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                            <div style={{ fontSize: 12, color: "#6B6B6B" }}>
-                                              <span style={{ fontWeight: 600 }}>Platform:</span> {video.platform}
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                              <div style={{ fontSize: 13, color: "var(--text-sec)", display: "flex", alignItems: "center", gap: 8 }}>
+                                                <span style={{ opacity: 0.6 }}>Platform:</span>
+                                                <Badge variant="active">{video.platform}</Badge>
+                                              </div>
+                                              <div style={{ fontSize: 13, color: "var(--text-sec)", display: "flex", alignItems: "center", gap: 8 }}>
+                                                <span style={{ opacity: 0.6 }}>Due Date:</span>
+                                                <span style={{ fontWeight: 500 }}>{video.dueDate}</span>
+                                              </div>
                                             </div>
-                                            <div style={{ fontSize: 12, color: "#6B6B6B" }}>
-                                              <span style={{ fontWeight: 600 }}>Due Date:</span> {video.dueDate}
-                                            </div>
-                                          </div>
 
                                           <div style={{ marginTop: 16, borderTop: "1px solid #F0F0EE", paddingTop: 16 }}>
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -617,17 +621,23 @@ export default function ProductionPage({
                                             {(video.notes || []).length === 0 ? (
                                               <div style={{ fontSize: 12, color: "#9B9B9B", fontStyle: "italic" }}>No notes for this video.</div>
                                             ) : (
-                                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                                {video.notes.map((n: any, ni: number) => (
-                                                  <div key={ni} style={{ fontSize: 12, padding: "8px 10px", background: "#F9F9F8", borderRadius: 6 }}>
-                                                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9B9B9B", marginBottom: 2 }}>
-                                                      <span>{n.from}</span>
-                                                      <span>{new Date(n.date).toLocaleDateString()}</span>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                              {(video.notes || []).map((n: any, ni: number) => {
+                                                const initials = n.from.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                                                return (
+                                                  <div key={ni} className="glass" style={{ padding: "12px 16px", borderRadius: "16px", border: "1px solid var(--border-light)", background: "rgba(255,255,255,0.4)" }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                                                      <Avatar initials={initials} size={24} />
+                                                      <div style={{ display: "flex", flexDirection: "column" }}>
+                                                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{n.from}</span>
+                                                        <span style={{ fontSize: 10, color: "var(--text-ter)" }}>{new Date(n.date).toLocaleDateString()} at {new Date(n.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                      </div>
                                                     </div>
-                                                    <div>{n.text}</div>
+                                                    <div style={{ fontSize: 13, color: "var(--text-sec)", lineHeight: 1.5, paddingLeft: 34 }}>{n.text}</div>
                                                   </div>
-                                                ))}
-                                              </div>
+                                                );
+                                              })}
+                                            </div>
                                             )}
                                           </div>
                                         </div>
@@ -637,21 +647,13 @@ export default function ProductionPage({
                                       <div>
                                         <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>History</div>
                                         {(() => {
-                                          const allNotes = (video.notes || []).map((n: any) => ({ ...n, videoTitle: video.title }));
-                                          if (allNotes.length === 0) return <div style={{ fontSize: 12, color: "#9B9B9B" }}>No history entries yet.</div>;
-                                          return (
-                                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                              {allNotes.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((n: any, i: number) => {
-                                                const actionColor = n.from === "Production" ? "#1A73E8" : n.from === "Publishing" ? "#4DAB9A" : "#9B9B9B";
-                                                return (
-                                                  <div key={i} style={{ padding: "8px 12px", background: "#FFFFFF", borderRadius: 6, borderLeft: `3px solid ${actionColor}`, fontSize: 12, border: "1px solid #E3E3E0", borderLeftWidth: 3 }}>
-                                                    <span style={{ color: "#9B9B9B", fontSize: 11 }}>{new Date(n.date).toLocaleDateString()} — {n.from}</span>
-                                                    <div style={{ color: "#1A1A1A", marginTop: 2 }}>{n.text}</div>
-                                                  </div>
-                                                );
-                                              })}
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                          <div className="glass-dark" style={{ padding: "20px", borderRadius: "16px", border: "1px solid var(--border-light)", textAlign: "center" }}>
+                                            <div style={{ fontSize: 13, color: "var(--text-ter)", fontStyle: "italic" }}>
+                                              No status updates or automated events recorded yet.
                                             </div>
-                                          );
+                                          </div>
+                                        </div>
                                         })()}
                                       </div>
                                     </div>
@@ -682,23 +684,34 @@ export default function ProductionPage({
               <div style={{ padding: "20px 24px", borderBottom: "1px solid #E3E3E0" }}>
                 <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Notes — {video.title}</h3>
               </div>
-              <div style={{ flex: 1, overflow: "auto", padding: "16px 24px" }}>
+              <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
                 {(video.notes || []).length === 0 ? (
-                  <div style={{ textAlign: "center", color: "#9B9B9B", padding: "24px 0", fontSize: 13 }}>No notes yet</div>
+                  <div style={{ textAlign: "center", color: "var(--text-ter)", padding: "40px 0", fontSize: 14 }}>No notes yet for this video.</div>
                 ) : (
-                  video.notes.map((n, i) => (
-                    <div key={i} style={{ padding: "10px 0", borderBottom: i < video.notes.length - 1 ? "1px solid #EBEBEA" : "none" }}>
-                      <div style={{ fontSize: 11, color: "#9B9B9B", marginBottom: 4 }}>{new Date(n.date).toLocaleDateString()} — {n.from}</div>
-                      <div style={{ fontSize: 13, color: "#1A1A1A" }}>{n.text}</div>
-                    </div>
-                  ))
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {video.notes.map((n, i) => {
+                      const initials = n.from.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                      return (
+                        <div key={i} className="glass" style={{ padding: "12px 16px", borderRadius: "16px", border: "1px solid var(--border-light)", background: "rgba(0,0,0,0.02)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                            <Avatar initials={initials} size={24} />
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{n.from}</span>
+                              <span style={{ fontSize: 10, color: "var(--text-ter)" }}>{new Date(n.date).toLocaleDateString()} at {new Date(n.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 13, color: "var(--text-sec)", lineHeight: 1.5, paddingLeft: 34 }}>{n.text}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
               <div style={{ padding: "16px 24px", borderTop: "1px solid #E3E3E0" }}>
                 <textarea value={noteText} onChange={e => setNoteText(e.target.value)} placeholder="Add a note..." rows={3} style={{ width: "100%", padding: "10px 12px", border: "1px solid #E3E3E0", borderRadius: 8, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                   <button onClick={() => { setNoteModalVideoId(null); setNoteText(""); }} style={{ padding: "8px 16px", border: "1px solid #E3E3E0", borderRadius: 6, background: "transparent", color: "#6B6B6B", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                  <button onClick={() => { if (!noteText.trim()) return; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: "Production", date: new Date().toISOString(), text: noteText.trim() }] } : v)); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
+                  <button onClick={() => { if (!noteText.trim()) return; setVideos(prev => prev.map(v => v.id === noteModalVideoId ? { ...v, notes: [...v.notes, { from: currentUser?.name || "Production", date: new Date().toISOString(), text: noteText.trim() }] } : v)); setNoteText(""); }} style={{ padding: "8px 16px", border: "none", borderRadius: 6, background: "#1A1A1A", color: "#FFF", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>Save Note</button>
                 </div>
               </div>
             </div>

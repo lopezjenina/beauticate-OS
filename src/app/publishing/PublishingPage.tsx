@@ -645,17 +645,22 @@ export default function PublishingPage({ videos, setVideos, userName, clients = 
                                       ) : (
                                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                           {video.notes.map((n, i) => {
-                                            const actionColor = n.from === "Publishing" ? "#4DAB9A" : n.from === "publishing" ? "#4DAB9A" : "#1A73E8";
+                                            const initials = n.from.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
                                             return (
-                                              <div key={i} style={{
-                                                padding: "8px 12px", background: "#FFFFFF",
-                                                borderRadius: 6, borderLeft: `3px solid ${actionColor}`,
-                                                fontSize: 12,
+                                              <div key={i} className="glass" style={{
+                                                padding: "12px 16px", borderRadius: "12px",
+                                                border: "1px solid var(--border-light)",
+                                                background: "rgba(255,255,255,0.4)",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
                                               }}>
-                                                <span style={{ color: "#9B9B9B", fontSize: 11 }}>
-                                                  {new Date(n.date).toLocaleDateString()} — {n.from}
-                                                </span>
-                                                <div style={{ color: "#1A1A1A", marginTop: 2 }}>{n.text}</div>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                                                  <Avatar initials={initials} size={24} />
+                                                  <div style={{ display: "flex", flexDirection: "column" }}>
+                                                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{n.from}</span>
+                                                    <span style={{ fontSize: 10, color: "var(--text-ter)" }}>{new Date(n.date).toLocaleDateString()}</span>
+                                                  </div>
+                                                </div>
+                                                <div style={{ color: "var(--text-sec)", fontSize: 13, lineHeight: 1.5, paddingLeft: 34 }}>{n.text}</div>
                                               </div>
                                             );
                                           })}

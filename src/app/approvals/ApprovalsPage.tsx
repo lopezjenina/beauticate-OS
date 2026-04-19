@@ -193,9 +193,9 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
                   style={{
                     background: "#FFF",
                     border: `1px solid ${isRevision ? "#F5DEB3" : "#E3E3E0"}`,
-                    borderRadius: 10,
+                    borderRadius: 12,
                     overflow: "hidden",
-                    borderLeft: isRevision ? "3px solid #CB7F2C" : "3px solid transparent",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
                   }}
                 >
                   {/* Card header */}
@@ -299,14 +299,19 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                             {video.notes.map((note, idx) => (
-                              <div key={idx} style={{
-                                background: "#FFF", padding: "12px 16px", borderRadius: 8,
-                                borderLeft: `3px solid ${note.action === "approve" ? "#4DAB9A" : note.action === "revision" ? "#CB7F2C" : "#E3E3E0"}`,
+                              <div key={idx} className="glass" style={{
+                                padding: "14px 18px", borderRadius: 12,
+                                border: "1px solid var(--border-light)",
+                                background: "rgba(255,255,255,0.4)",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
                               }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{note.from}</span>
-                                    <span style={{ fontSize: 11, color: "#9B9B9B" }}>{formatDate(note.date)}</span>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <Avatar initials={note.from.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()} size={24} />
+                                    <div style={{ display: "flex", flexDirection: "column" }}>
+                                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{note.from}</span>
+                                      <span style={{ fontSize: 10, color: "var(--text-ter)" }}>{formatDate(note.date)}</span>
+                                    </div>
                                   </div>
                                   {note.action && (
                                     <Badge variant={note.action === "approve" ? "success" : "warning"}>
@@ -314,7 +319,7 @@ export default function ApprovalsPage({ videos, setVideos, userName, clients = [
                                     </Badge>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.5 }}>{note.text}</div>
+                                <div style={{ fontSize: 13, color: "var(--text-sec)", lineHeight: 1.5, paddingLeft: 34 }}>{note.text}</div>
                               </div>
                             ))}
                           </div>

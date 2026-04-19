@@ -247,7 +247,7 @@ export default function App() {
       case "clients":
         return <ClientsPage clients={clients} setClients={setClients} canDelete={canDelete} />;
       case "production":
-        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} users={users} />;
+        return <ProductionPage clients={clients} videos={videos} setVideos={setVideos} canDelete={canDelete} users={users} currentUser={user} />;
       case "approvals":
         return <ApprovalsPage videos={videos} setVideos={setVideos} userName={user.name} clients={clients} users={users} />;
       case "publishing":

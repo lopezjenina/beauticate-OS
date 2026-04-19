@@ -326,7 +326,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
                 {CONTENT_TYPES.map(t => <option key={t}>{t}</option>)}
               </select>
               <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 10 }}>
-                <Btn variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Btn>
+                <Btn variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Btn>
                 <Btn variant="primary" onClick={handleSubmit}>Create Draft</Btn>
               </div>
             </div>
@@ -392,7 +392,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
               <div style={{ display: "flex", gap: 12 }}>
                 {isEditing ? (
                   <>
-                    <Btn variant="secondary" onClick={() => { 
+                    <Btn variant="ghost" onClick={() => { 
                       setIsEditing(false); 
                       const match = contentItems.find(i => i.id === viewItem.id);
                       if (match) setViewItem(match);
@@ -408,10 +408,10 @@ export default function PublishingPage({ userName }: { userName?: string }) {
                   </>
                 ) : (
                   <>
-                    <Btn variant="secondary" onClick={() => setIsEditing(true)}>Edit Content</Btn>
+                    <Btn variant="ghost" onClick={() => setIsEditing(true)}>Edit Content</Btn>
                     {viewItem.status === "draft" && <Btn variant="primary" onClick={() => handleOptimize(viewItem)} disabled={optimizingId === viewItem.id}>{optimizingId === viewItem.id ? "Optimizing..." : "✨ Run AI Optimization"}</Btn>}
                     {viewItem.status === "review" && <Btn variant="primary" onClick={() => moveStatus(viewItem, "approved")}>Approve & Ready</Btn>}
-                    <Btn variant="secondary" onClick={() => setViewItem(null)}>Close</Btn>
+                    <Btn variant="ghost" onClick={() => setViewItem(null)}>Close</Btn>
                   </>
                 )}
               </div>

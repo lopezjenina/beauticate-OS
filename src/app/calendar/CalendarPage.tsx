@@ -1,70 +1,48 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Badge, Btn, PageHeader } from '@/components/ui';
-import { Client, Video } from '@/lib/types';
-import { AppUser } from '@/lib/auth';
+import { fetchContent, ContentPipeline } from '@/lib/db';
 
-interface CalendarPageProps {
-  clients?: Client[];
-  videos?: Video[];
-  users?: AppUser[];
-}
-
-export default function CalendarPage({
-  clients = [],
-  videos = [],
-  users = [],
-}: CalendarPageProps) {
+export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+  const [contents, setContents] = useState<ContentPipeline[]>([]);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
+  useEffect(() => {
+    fetchContent().then(setContents);
+  }, []);
+
   const daysInMonth = new Date(currentMonth.year, currentMonth.month + 1, 0).getDate();
   const firstDayOfWeek = new Date(currentMonth.year, currentMonth.month, 1).getDay();
   const monthName = new Date(currentMonth.year, currentMonth.month).toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  // Map shoot dates to events
+  // Map scheduled_date to events
   const events = useMemo(() => {
-    const map: Record<number, { client: string; type: string; color: string }[]> = {};
+    const map: Record<number, { title: string; type: string; status: string; color: string }[]> = {};
 
-    clients.forEach(c => {
-      if (c.shootDate) {
-        const d = new Date(c.shootDate);
+    contents.forEach(c => {
+      if (c.scheduledDate) {
+        const d = new Date(c.scheduledDate);
         if (d.getMonth() === currentMonth.month && d.getFullYear() === currentMonth.year) {
           const day = d.getDate();
           if (!map[day]) map[day] = [];
-          map[day].push({ client: c.name, type: "shoot", color: "#2383E2" });
-        }
-      }
-    });
+          let color = "#1A1A1A"; // default
+          if (c.status === "published") color = "#4DAB9A";
+          else if (c.status === "staged" || c.status === "pending_approval") color = "#CB7F2C";
+          else if (c.status === "approved") color = "#2383E2";
 
-    videos.forEach(v => {
-      if (v.dueDate) {
-        const d = new Date(v.dueDate);
-        if (d.getMonth() === currentMonth.month && d.getFullYear() === currentMonth.year) {
-          const day = d.getDate();
-          if (!map[day]) map[day] = [];
-          const clientName = clients.find(c => c.id === v.clientId)?.name || "Unknown";
-          map[day].push({ client: clientName, type: "due", color: "#EB5757" });
-        }
-      }
-      if (v.scheduledDate) {
-        const d = new Date(v.scheduledDate);
-        if (d.getMonth() === currentMonth.month && d.getFullYear() === currentMonth.year) {
-          const day = d.getDate();
-          if (!map[day]) map[day] = [];
-          const clientName = clients.find(c => c.id === v.clientId)?.name || "Unknown";
-          map[day].push({ client: clientName, type: "publish", color: "#4DAB9A" });
+          map[day].push({ title: c.title, type: c.type, status: c.status, color });
         }
       }
     });
 
     return map;
-  }, [clients, videos, currentMonth]);
+  }, [contents, currentMonth]);
 
   const prevMonth = () => {
     setSelectedDay(null);
@@ -90,7 +68,7 @@ export default function CalendarPage({
 
   return (
     <div style={{ padding: '40px' }}>
-      <PageHeader title="Calendar" subtitle="Shoot schedule and deadlines at a glance">
+      <PageHeader title="Content Calendar" subtitle="Scheduled and published content">
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Btn onClick={prevMonth}>&larr;</Btn>
           <span style={{ fontSize: 15, fontWeight: 600, minWidth: 160, textAlign: "center" }}>{monthName}</span>
@@ -100,9 +78,10 @@ export default function CalendarPage({
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginBottom: 24, fontSize: 12, color: "#6B6B6B" }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#2383E2", marginRight: 6 }}></span>Shoot</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#EB5757", marginRight: 6 }}></span>Due Date</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#4DAB9A", marginRight: 6 }}></span>Publish</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#4DAB9A", marginRight: 6 }}></span>Published</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#2383E2", marginRight: 6 }}></span>Approved (Ready)</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#CB7F2C", marginRight: 6 }}></span>In Progress</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#1A1A1A", marginRight: 6 }}></span>Draft</span>
       </div>
 
       {/* Calendar Grid */}
@@ -118,7 +97,7 @@ export default function CalendarPage({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
           {/* Empty cells for offset */}
           {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-            <div key={`empty-${i}`} style={{ minHeight: 90, borderRight: "1px solid #EBEBEA", borderBottom: "1px solid #EBEBEA", background: "#FAFAFA" }} />
+            <div key={`empty-${i}`} style={{ minHeight: 110, borderRight: "1px solid #EBEBEA", borderBottom: "1px solid #EBEBEA", background: "#FAFAFA" }} />
           ))}
 
           {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -130,30 +109,30 @@ export default function CalendarPage({
                 onMouseEnter={() => { if (dayEvents.length > 0) setHoveredDay(day); }}
                 onMouseLeave={() => setHoveredDay(null)}
                 style={{
-                minHeight: 90, padding: "6px 8px",
+                minHeight: 110, padding: "8px", display: "flex", flexDirection: "column",
                 borderRight: "1px solid #EBEBEA", borderBottom: "1px solid #EBEBEA",
-                background: isToday(day) ? "#E8F0FE" : (dayEvents.length > 0 && hoveredDay === day) ? "#F7F7F5" : "#FFF",
+                background: isToday(day) ? "#EAF5F2" : (dayEvents.length > 0 && hoveredDay === day) ? "#F7F7F5" : "#FFF",
                 cursor: dayEvents.length > 0 ? "pointer" : "default",
                 transition: "background 0.15s",
               }}>
                 <div style={{
-                  fontSize: 12, fontWeight: isToday(day) ? 700 : 400,
-                  color: isToday(day) ? "#2383E2" : "#1A1A1A", marginBottom: 4,
+                  fontSize: 12, fontWeight: isToday(day) ? 700 : 500,
+                  color: isToday(day) ? "#4DAB9A" : "#1A1A1A", marginBottom: 6,
                 }}>
                   {day}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
                   {dayEvents.slice(0, 3).map((ev, j) => (
                     <div key={j} style={{
-                      fontSize: 10, padding: "2px 4px", borderRadius: 3,
-                      background: ev.color + "18", color: ev.color,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      fontSize: 10, padding: "3px 6px", borderRadius: 4,
+                      background: ev.color + "1A", color: ev.color, fontWeight: 500,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", border: `1px solid ${ev.color}33`,
                     }}>
-                      {ev.client}
+                      {ev.title}
                     </div>
                   ))}
                   {dayEvents.length > 3 && (
-                    <div style={{ fontSize: 10, color: "#9B9B9B" }}>+{dayEvents.length - 3} more</div>
+                    <div style={{ fontSize: 10, color: "#9B9B9B", fontWeight: 600, paddingLeft: 4 }}>+{dayEvents.length - 3} more</div>
                   )}
                 </div>
               </div>
@@ -163,20 +142,25 @@ export default function CalendarPage({
       </div>
 
       {selectedDay && events[selectedDay] && (
-        <div style={{ marginTop: 24, border: "1px solid #E3E3E0", borderRadius: 8, padding: 20 }}>
+        <div style={{ marginTop: 24, border: "1px solid #E3E3E0", borderRadius: 8, padding: 20, background: "#FFF", boxShadow: "0 4px 12px rgba(0,0,0,0.03)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
-              {monthName.split(' ')[0]} {selectedDay} Events
+              {monthName.split(' ')[0]} {selectedDay} Schedule
             </h3>
-            <button onClick={() => setSelectedDay(null)} style={{ border: "none", background: "transparent", color: "#9B9B9B", fontSize: 18, cursor: "pointer" }}>×</button>
+            <button onClick={() => setSelectedDay(null)} style={{ border: "none", background: "transparent", color: "#9B9B9B", fontSize: 24, cursor: "pointer", lineHeight: 1 }}>&times;</button>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {events[selectedDay].map((ev, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "#F7F7F5", borderRadius: 6 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: ev.color, flexShrink: 0 }} />
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 16px", background: "#F7F7F5", borderRadius: 8, border: "1px solid #E3E3E0" }}>
+                <div style={{ width: 12, height: 12, borderRadius: "50%", background: ev.color, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 2 }}>{ev.title}</div>
+                  <div style={{ fontSize: 12, color: "#6B6B6B", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 500 }}>{ev.type}</div>
+                </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{ev.client}</div>
-                  <div style={{ fontSize: 12, color: "#6B6B6B" }}>{ev.type === "shoot" ? "Shoot Day" : ev.type === "due" ? "Due Date" : "Publish Date"}</div>
+                  <Badge variant={ev.status === "published" ? "success" : ev.status === "draft" ? "default" : "warning"}>
+                    {ev.status}
+                  </Badge>
                 </div>
               </div>
             ))}

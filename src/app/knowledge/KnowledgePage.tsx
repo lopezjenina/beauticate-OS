@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Btn, ConfirmModal, FileUploadArea, AttachmentList, LinkInput } from '@/components/ui';
 import { KB_CATEGORIES, KB_DOCS } from '@/lib/store';
 import type { KBDoc, Attachment } from '@/lib/types';
-import { upsertKBDoc, deleteKBDoc as deleteKBDocDb } from '@/lib/db';
+import { upsertKBDoc, deleteKBDoc as deleteKBDocDb, fetchKBDocs } from '@/lib/db';
 
 export default function KnowledgePage({ canDelete = false }: { canDelete?: boolean } = {}) {
-  const [docs, setDocs] = useState<KBDoc[]>(KB_DOCS);
+  const [docs, setDocs] = useState<KBDoc[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>(KB_CATEGORIES[0]);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,6 +16,12 @@ export default function KnowledgePage({ canDelete = false }: { canDelete?: boole
   const [deletingDoc, setDeletingDoc] = useState<KBDoc | null>(null);
   const [formData, setFormData] = useState({ title: '', category: '', body: '', author: '' });
   const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
+
+  useEffect(() => {
+    fetchKBDocs().then(data => {
+      setDocs(data);
+    });
+  }, []);
 
   const filteredDocs = docs.filter((doc) => {
     const matchesCategory = doc.category === selectedCategory;

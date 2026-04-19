@@ -15,7 +15,7 @@ const NAV: NavItem[] = [
   // { id: "onboarding", label: "Onboarding", group: "pipeline" },
   { id: "clients", label: "Clients", group: "pipeline" },
   { id: "publishing", label: "Content Engine", group: "operations" }, // Formerly Publishing
-  { id: "production", label: "Creative Studio", group: "operations" }, // Formerly Production
+  // { id: "production", label: "Creative Studio", group: "operations" }, // Formerly Production
   { id: "approvals", label: "Approvals", group: "operations" },
   // { id: "editors", label: "Editors", group: "team" },
   // { id: "ads", label: "Ads", group: "team" },

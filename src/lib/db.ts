@@ -472,11 +472,9 @@ export async function fetchActivityLog(): Promise<ActivityEntry[]> {
   } catch (err) { dbError("fetchActivityLog exception:", err); return []; }
 }
 
-export async function logActivityToDb(entry: Omit<ActivityEntry, "id" | "timestamp">): Promise<void> {
+export async function logActivityToDb(entry: ActivityEntry): Promise<void> {
   try {
     const row = toSnakeCase(entry as unknown as Record<string, unknown>);
-    row.id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    row.timestamp = new Date().toISOString();
     const { error } = await supabase.from("activity_log").insert(row);
     if (error) dbError("logActivityToDb error:", error);
   } catch (err) { dbError("logActivityToDb exception:", err); }

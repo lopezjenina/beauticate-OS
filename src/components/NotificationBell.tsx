@@ -54,17 +54,6 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showDropdown]);
 
-  useEffect(() => {
-    if (showDropdown && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      let calcTop = rect.top;
-      const spaceBelow = window.innerHeight - rect.top;
-      if (spaceBelow < 400) {
-        calcTop = Math.max(20, window.innerHeight - 420);
-      }
-      setDropdownPos({ top: calcTop, left: rect.right + 8 });
-    }
-  }, [showDropdown]);
 
   const notifications = useMemo(() => {
     const notifs: Notification[] = [];
@@ -150,19 +139,17 @@ export function NotificationBell({ videos, leads, onNavigate }: NotificationBell
         )}
       </button>
 
-      {showDropdown && dropdownPos && (
+      {showDropdown && (
         <div style={{
-          position: "fixed", top: dropdownPos.top, left: dropdownPos.left,
-          width: 320, background: "#FFF", border: "1px solid #E3E3E0",
-          borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          zIndex: 1200, maxHeight: 400, overflow: "auto",
+          marginTop: 4, width: "100%", background: "rgba(0,0,0,0.02)",
+          borderRadius: 8, overflow: "hidden",
         }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #E3E3E0", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Notifications ({visibleNotifications.length})</span>
-            <button onClick={() => { setDismissedIds(prev => { const next = new Set(prev); visibleNotifications.forEach(n => next.add(n.id)); return next; }); setShowDropdown(false); }} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Dismiss all</button>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", fontSize: 12, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>New Alerts</span>
+            <button onClick={() => { setDismissedIds(prev => { const next = new Set(prev); visibleNotifications.forEach(n => next.add(n.id)); return next; }); setShowDropdown(false); }} style={{ border: "none", background: "transparent", color: "var(--text-ter)", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>Clear</button>
           </div>
           {visibleNotifications.length === 0 ? (
-            <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 13, color: "#9B9B9B" }}>
+            <div style={{ padding: "16px", textAlign: "center", fontSize: 12, color: "#9B9B9B" }}>
               All caught up!
             </div>
           ) : (

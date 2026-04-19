@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Client, Video, Lead, AdCampaign } from "@/lib/types";
+import { ContentPipeline } from "@/lib/db";
 import { WEEKLY_TARGET } from "@/lib/store";
 import { AppUser } from "@/lib/auth";
 import { Avatar, Badge, Btn, Stat, PageHeader, ProgressBar, EmptyState } from "@/components/ui";
@@ -57,6 +58,12 @@ export default function DashboardPage({
   const today = new Date("2026-03-30");
   const [periodFilter, setPeriodFilter] = useState("month");
 
+  const [contents, setContents] = useState<ContentPipeline[]>([]);
+  
+  useEffect(() => {
+    import("@/lib/db").then(m => m.fetchContent().then(setContents));
+  }, []);
+
   // ─── Core Stats ───
   const activeClients = useMemo(() => clients.filter((c) => c.status === "active").length, [clients]);
 
@@ -65,28 +72,22 @@ export default function DashboardPage({
     [clients]
   );
 
-  const videosThisWeek = useMemo(
-    () => videos.filter((v) => {
-      const shootDate = new Date(v.shootDate);
+  const contentsThisWeek = useMemo(
+    () => contents.filter((c) => {
+      if (!c.scheduledDate) return false;
+      const d = new Date(c.scheduledDate);
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - today.getDay());
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
-      return shootDate >= weekStart && shootDate <= weekEnd;
+      return d >= weekStart && d <= weekEnd;
     }).length,
-    [videos, today]
+    [contents, today]
   );
 
-  const editorCapacity = useMemo(() => {
-    const assigned = videos.filter((v) => v.editingStatus !== "approved").length;
-    const editors = users.filter((u) => u.role === "editor");
-    const totalCap = editors.length * 22; // Default cap 22 since we removed static cap
-    return totalCap > 0 ? Math.round((assigned / totalCap) * 100) : 0;
-  }, [videos, users]);
-
-  const contentPendingApproval = useMemo(
-    () => videos.filter((v) => v.editingStatus === "delivered").length,
-    [videos]
+  const pendingApprovals = useMemo(
+    () => contents.filter((c) => c.status === "pending_approval").length,
+    [contents]
   );
 
   const activeAds = useMemo(() => ads.filter((a) => a.status === "active").length, [ads]);
@@ -147,129 +148,54 @@ export default function DashboardPage({
     }));
   }, [leads]);
 
-  // ─── Content Velocity ───
-  const videosCompletedThisMonth = useMemo(
-    () => videos.filter((v) => v.editingStatus === "approved" || v.posted).length,
-    [videos]
-  );
-
-  const videosInProgress = useMemo(
-    () => videos.filter((v) => v.editingStatus === "editing" || v.editingStatus === "delivered").length,
-    [videos]
-  );
-
-  const revisionRate = useMemo(() => {
-    if (videos.length === 0) return 0;
-    const withRevisions = videos.filter((v) => v.revisionsUsed > 0).length;
-    return Math.round((withRevisions / videos.length) * 100);
-  }, [videos]);
-
   // ─── Content Pipeline Chart Data ───
   const contentPipelineData = useMemo(() => {
-    const statuses = ["not_started", "editing", "delivered", "revision", "approved"] as const;
+    const statuses = ["draft", "optimized", "staged", "pending_approval", "approved", "published"] as const;
     const labels: Record<string, string> = {
-      not_started: "Not Started",
-      editing: "Editing",
-      delivered: "Delivered",
-      revision: "Revision",
+      draft: "Drafts",
+      optimized: "AI Optimized",
+      staged: "Staged",
+      pending_approval: "Reviewing",
       approved: "Approved",
+      published: "Published",
     };
     return statuses.map((s) => ({
       name: labels[s],
-      count: videos.filter((v) => v.editingStatus === s).length,
+      count: contents.filter((c) => c.status === s).length,
     }));
-  }, [videos]);
+  }, [contents]);
 
-  // ─── Team Performance ───
+  // ─── Team / Content Breakdown ───
   const teamData = useMemo(() => {
-    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
-    return editors.map((editor) => {
-      const editorVideos = videos.filter((v) => v.editorId === editor.id);
-      const assigned = editorVideos.filter((v) => v.editingStatus !== "approved").length;
-      const completed = editorVideos.filter((v) => v.editingStatus === "approved").length;
-      const weeklyVideoCap = 22;
-      const capacityPct = Math.round((assigned / weeklyVideoCap) * 100);
+    const contentTypes = ["Blog", "Social", "EDM", "Graphic", "Adhoc"];
+    return contentTypes.map((type) => {
+      const typeContents = contents.filter((c) => c.type === type);
+      const inProgress = typeContents.filter((c) => c.status !== "published").length;
+      const completed = typeContents.filter((c) => c.status === "published").length;
       return { 
-        editor: { 
-          ...editor, 
-          name: editor.username, 
-          initials: editor.username.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() 
-        }, 
-        assigned, 
+        type, 
+        inProgress, 
         completed, 
-        total: editorVideos.length, 
-        capacityPct 
+        total: typeContents.length, 
       };
-    });
-  }, [videos, users]);
+    }).filter(d => d.total > 0);
+  }, [contents]);
 
   // ─── Bottlenecks ───
-  const editorsOverCapacity = useMemo(() => {
-    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
-    return editors.map((editor) => {
-      const assigned = videos.filter(
-        (v) => v.editorId === editor.id && v.editingStatus !== "approved"
-      ).length;
-      const weeklyCap = editor.weeklyVideoCap || 22;
-      return {
-        editor: { ...editor, name: editor.username, weeklyVideoCap: weeklyCap },
-        assigned,
-        isCapped: assigned > weeklyCap,
-      };
-    }).filter((e) => e.isCapped);
-  }, [videos, users]);
-
   const contentNotScheduledAhead = useMemo(() => {
     const sevenDaysOut = new Date(today);
     sevenDaysOut.setDate(today.getDate() + 7);
-    return videos.filter((v) => {
-      if (!v.scheduledDate) return false;
-      const schedDate = new Date(v.scheduledDate);
-      return schedDate < sevenDaysOut && v.editingStatus !== "approved";
+    return contents.filter((c) => {
+      if (!c.scheduledDate) return false;
+      const schedDate = new Date(c.scheduledDate);
+      return schedDate < sevenDaysOut && c.status !== "approved" && c.status !== "published";
     });
-  }, [videos, today]);
-
-  const clientsStuckSameStage = useMemo(() => {
-    const threshold = new Date(today);
-    threshold.setDate(today.getDate() - 14);
-    return clients.filter((c) => {
-      const clientVideos = videos.filter((v) => v.clientId === c.id);
-      const allApproved = clientVideos.every((v) => v.editingStatus === "approved");
-      const allSameStage = clientVideos.length > 0 && clientVideos.every((v) => v.editingStatus === clientVideos[0].editingStatus);
-      return allSameStage && !allApproved;
-    });
-  }, [clients, videos]);
-
-  // ─── Editor Chart Data ───
-  const chartData = useMemo(() => {
-    const editors = users.filter((u) => u.role === "editor" || u.role === "videographer");
-    return editors.map((editor) => {
-      const assigned = videos.filter(
-        (v) => v.editorId === editor.id && v.editingStatus !== "approved"
-      ).length;
-      const completed = videos.filter(
-        (v) => v.editorId === editor.id && v.editingStatus === "approved"
-      ).length;
-      return {
-        name: editor.username.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase(),
-        assigned,
-        completed,
-      };
-    });
-  }, [videos, users]);
+  }, [contents, today]);
 
   // ─── Helpers ───
   const fmtCurrency = (n: number) => {
     if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
     return `$${n.toLocaleString()}`;
-  };
-
-  const weeklyPct = WEEKLY_TARGET > 0 ? Math.min(Math.round((videosThisWeek / WEEKLY_TARGET) * 100), 100) : 0;
-
-  const capacityDotColor = (pct: number) => {
-    if (pct > 100) return ACCENT_RED;
-    if (pct > 80) return ACCENT_ORANGE;
-    return ACCENT_GREEN;
   };
 
   const alertBorderColor = (severity: "danger" | "warning" | "info") => {
@@ -278,65 +204,24 @@ export default function DashboardPage({
     return PRIMARY;
   };
 
-  /* ─── Progress Ring SVG ─── */
-  const ProgressRing = ({ pct, size = 48 }: { pct: number; size?: number }) => {
-    const stroke = 4;
-    const r = (size - stroke) / 2;
-    const circ = 2 * Math.PI * r;
-    const offset = circ - (pct / 100) * circ;
-    return (
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E8E8E6" strokeWidth={stroke} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={PRIMARY}
-          strokeWidth={stroke}
-          strokeDasharray={circ}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  };
-
   /* ─── Bottleneck alerts combined ─── */
   const bottleneckAlerts = useMemo(() => {
     const alerts: { key: string; severity: "danger" | "warning" | "info"; title: string; detail: string }[] = [];
-    editorsOverCapacity.forEach((item) => {
-      alerts.push({
-        key: `oc-${item.editor.id}`,
-        severity: "danger",
-        title: `${item.editor.name} over capacity`,
-        detail: `${item.assigned}/${item.editor.weeklyVideoCap || 22} videos assigned`,
-      });
-    });
-    contentNotScheduledAhead.slice(0, 5).forEach((v) => {
-      const client = clients.find((c) => c.id === v.clientId);
-      const daysOut = v.scheduledDate
-        ? Math.ceil((new Date(v.scheduledDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    
+    contentNotScheduledAhead.slice(0, 5).forEach((c) => {
+      const daysOut = c.scheduledDate
+        ? Math.ceil((new Date(c.scheduledDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
         : null;
       alerts.push({
-        key: `ns-${v.id}`,
+        key: `ns-${c.id}`,
         severity: daysOut !== null && daysOut < 0 ? "danger" : "warning",
-        title: `Content not ready: ${client?.name || "Unknown"}`,
-        detail: daysOut !== null ? `${daysOut} days until scheduled` : "No schedule date",
+        title: `Content needs attention: ${c.title}`,
+        detail: daysOut !== null ? `${daysOut} days until scheduled but not approved` : "No schedule date",
       });
     });
-    clientsStuckSameStage.forEach((c) => {
-      const clientVideos = videos.filter((vv) => vv.clientId === c.id);
-      const stage = clientVideos[0]?.editingStatus || "unknown";
-      alerts.push({
-        key: `stuck-${c.id}`,
-        severity: "warning",
-        title: `${c.name} stuck in stage`,
-        detail: `All videos at "${stage}"`,
-      });
-    });
+    
     return alerts;
-  }, [editorsOverCapacity, contentNotScheduledAhead, clientsStuckSameStage, clients, videos, today]);
+  }, [contentNotScheduledAhead, today]);
 
   // ─── Table header cell style ───
   const thStyle: React.CSSProperties = {
@@ -358,7 +243,7 @@ export default function DashboardPage({
           <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
             Dashboard
           </h1>
-          <p style={{ fontSize: 13, color: "#6B6B6B", margin: "4px 0 0" }}>Agency operations at a glance</p>
+          <p style={{ fontSize: 13, color: "#6B6B6B", margin: "4px 0 0" }}>Pipeline & Content ops</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* Period selector */}
@@ -378,10 +263,7 @@ export default function DashboardPage({
             <option value="quarter">This Quarter</option>
             <option value="year">This Year</option>
           </select>
-          <Btn onClick={() => exportClients(clients)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Clients</Btn>
-          <Btn onClick={() => exportLeads(leads)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Leads</Btn>
-          <Btn onClick={() => exportVideos(videos)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Videos</Btn>
-          <Btn onClick={() => exportCampaigns(ads)} style={{ fontSize: 11, padding: "6px 12px" }}>Export Ads</Btn>
+          <Btn onClick={() => {}} style={{ fontSize: 11, padding: "6px 12px" }}>Export Report</Btn>
         </div>
       </div>
 
@@ -392,11 +274,6 @@ export default function DashboardPage({
           <div style={statLabel}>Active Clients</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <div style={statValue}>{activeClients}</div>
-            {activeClients > 0 && (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ACCENT_GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="18 15 12 9 6 15" />
-              </svg>
-            )}
           </div>
         </div>
 
@@ -406,40 +283,18 @@ export default function DashboardPage({
           <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(monthlyRevenue)}</div>
         </div>
 
-        {/* Videos This Week */}
+        {/* Content Scheduled This Week */}
         <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${LIGHT}`, padding: "20px 24px 24px" }}>
-          <div style={statLabel}>Videos This Week</div>
+          <div style={statLabel}>Content This Week</div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
-            <div style={statValue}>{videosThisWeek}</div>
-            <div style={{ position: "relative", width: 48, height: 48 }}>
-              <ProgressRing pct={weeklyPct} size={48} />
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: 48,
-                  height: 48,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: PRIMARY,
-                }}
-              >
-                {weeklyPct}%
-              </div>
-            </div>
+            <div style={statValue}>{contentsThisWeek}</div>
           </div>
-          <div style={{ fontSize: 11, color: "#6B6B6B", marginTop: 4 }}>of {WEEKLY_TARGET} target</div>
         </div>
 
-        {/* Ad Spend */}
+        {/* Pending Approvals */}
         <div className="glass" style={{ ...cardStyle, borderTop: `4px solid ${ACCENT_ORANGE}`, padding: "20px 24px 24px" }}>
-          <div style={statLabel}>Ad Spend</div>
-          <div style={{ ...statValue, marginTop: 8 }}>{fmtCurrency(totalAdSpend)}</div>
-          <div style={{ fontSize: 11, color: "#6B6B6B", marginTop: 4 }}>{activeAds} active campaigns</div>
+          <div style={statLabel}>Pending Approvals</div>
+          <div style={{ ...statValue, marginTop: 8 }}>{pendingApprovals}</div>
         </div>
       </div>
 
@@ -464,7 +319,7 @@ export default function DashboardPage({
                   boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                 }}
               />
-              <Bar dataKey="count" fill={PRIMARY} radius={[6, 6, 0, 0]} name="Videos" />
+              <Bar dataKey="count" fill={PRIMARY} radius={[6, 6, 0, 0]} name="Contents" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -472,7 +327,7 @@ export default function DashboardPage({
         {/* Pipeline Health */}
         <div className="glass" style={cardStyle}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 20 }}>
-            Pipeline Health
+            Lead Pipeline Health
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {leadStages.map((stage) => {
@@ -498,84 +353,40 @@ export default function DashboardPage({
               );
             })}
           </div>
-          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid #E8E8E6", display: "flex", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Conversion</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: PRIMARY }}>{conversionRate}%</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Pipeline Value</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{fmtCurrency(pipelineValue)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: "#6B6B6B", fontWeight: 500 }}>Avg Deal</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A" }}>{fmtCurrency(avgDealSize)}</div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ═══════════════ 4. Revenue Row ═══════════════ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: sectionGap, marginBottom: sectionGap }}>
-        {[
-          { label: "Monthly Recurring Revenue", value: fmtCurrency(mrr) },
-          { label: "Quarterly Revenue", value: fmtCurrency(quarterlyRevenue) },
-          { label: "Annual Run Rate", value: fmtCurrency(annualRunRate) },
-          { label: "Avg Revenue / Client", value: fmtCurrency(avgRevenuePerClient) },
-        ].map((item) => (
-          <div key={item.label} className="glass" style={cardStyle}>
-            <div style={statLabel}>{item.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", marginTop: 8, letterSpacing: "-0.02em" }}>{item.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* ═══════════════ 5. Team Performance ═══════════════ */}
+      {/* ═══════════════ 4. Team Performance / Content Type ═══════════════ */}
       <div className="glass" style={{ ...cardStyle, padding: 0, overflow: "hidden", marginBottom: sectionGap }}>
         <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
-          Team Performance
+          Content Distribution
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 12 }}>
           <thead>
             <tr style={{ background: "#FAFAFA", borderBottom: "1px solid #E8E8E6" }}>
-              <th style={thStyle}>Editor</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Assigned</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Completed</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>Capacity</th>
+              <th style={thStyle}>Type</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>In Progress</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Published</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {teamData.map((row, idx) => (
               <tr
-                key={row.editor.id}
+                key={row.type}
                 style={{ borderBottom: idx < teamData.length - 1 ? "1px solid #E8E8E6" : "none" }}
               >
                 <td style={{ padding: "12px 20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {/* Capacity dot */}
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: capacityDotColor(row.capacityPct),
-                        flexShrink: 0,
-                      }}
-                    />
-                    <Avatar initials={row.editor.initials} size={28} />
-                    <span style={{ color: "#1A1A1A", fontWeight: 500 }}>{row.editor.name}</span>
-                  </div>
+                  <span style={{ color: "#1A1A1A", fontWeight: 500 }}>{row.type}</span>
                 </td>
                 <td style={{ textAlign: "right", padding: "12px 20px", color: "#1A1A1A" }}>
-                  {row.assigned}
+                  {row.inProgress}
                 </td>
                 <td style={{ textAlign: "right", padding: "12px 20px", color: "#1A1A1A" }}>
                   {row.completed}
                 </td>
-                <td style={{ textAlign: "right", padding: "12px 20px" }}>
-                  <Badge variant={row.capacityPct > 100 ? "danger" : row.capacityPct > 80 ? "warning" : "default"}>
-                    {row.capacityPct}%
-                  </Badge>
+                <td style={{ textAlign: "right", padding: "12px 20px", fontWeight: 600 }}>
+                  {row.total}
                 </td>
               </tr>
             ))}
@@ -583,10 +394,10 @@ export default function DashboardPage({
         </table>
       </div>
 
-      {/* ═══════════════ 6. Bottleneck Alerts ═══════════════ */}
+      {/* ═══════════════ 5. Bottleneck Alerts ═══════════════ */}
       <div className="glass" style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "20px 24px 0", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
-          Bottleneck Alerts
+          Bottleneck Alerts (Content)
         </div>
         {bottleneckAlerts.length === 0 ? (
           <div style={{ padding: "20px 24px 24px", fontSize: 13, color: "#6B6B6B" }}>

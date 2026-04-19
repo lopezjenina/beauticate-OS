@@ -45,7 +45,7 @@ export default function PublishingPage({ userName }: Props) {
     
     const isNew = !editingItem.id;
     const payload: ContentPipeline = {
-      id: editingItem.id || `content-${Date.now()}`,
+      id: editingItem.id || crypto.randomUUID(),
       title: editingItem.title,
       type: editingItem.type,
       rawDraft: editingItem.rawDraft || "",
@@ -102,49 +102,48 @@ export default function PublishingPage({ userName }: Props) {
   };
 
   return (
-    <div style={{ padding: "0 40px 60px", background: "#FFFFFF", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 1600, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
-          <PageHeader title="Content Engine" subtitle="Automated Publishing Pipeline" />
-          <Btn variant="primary" onClick={() => { setEditingItem({ type: "Blog", status: "draft" }); setModalOpen(true); }}>
-            + New Draft
-          </Btn>
-        </div>
+    <div style={{ display: "flex", flexDirection: "column", padding: "0 40px", background: "#FFFFFF", height: "100%", minHeight: "calc(100vh - 96px)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 32 }}>
+        <PageHeader title="Content Engine" subtitle="Automated Publishing Pipeline" />
+        <Btn variant="primary" onClick={() => { setEditingItem({ type: "Blog", status: "draft" }); setModalOpen(true); }}>
+          + New Draft
+        </Btn>
+      </div>
 
-        <div style={{ display: "flex", gap: 20, overflowX: "auto", paddingBottom: 20 }}>
-          {COLUMNS.map(col => {
-            const items = contentItems.filter(i => i.status === col.id);
-            return (
-              <div key={col.id} style={{ flex: "0 0 320px", background: "#F7F7F5", borderRadius: 12, padding: 16, border: "1px solid #E3E3E0" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
-                  {col.label}
-                  <span style={{ color: "#9B9B9B", background: "#EBEBEA", padding: "2px 8px", borderRadius: 10, fontSize: 11 }}>{items.length}</span>
-                </div>
-                
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 200 }}>
-                  {items.map(item => (
-                    <div key={item.id} className="glass" style={{ background: "#FFFFFF", padding: 16, borderRadius: 8, border: "1px solid #E3E3E0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", cursor: "pointer" }} onClick={() => { setEditingItem(item); setModalOpen(true); }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#6B6B6B", textTransform: "uppercase" }}>{item.type}</span>
-                        {item.scheduledDate && <span style={{ fontSize: 10, color: "#4DAB9A", background: "#EAF5F2", padding: "2px 6px", borderRadius: 4 }}>{new Date(item.scheduledDate).toLocaleDateString()}</span>}
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, lineHeight: 1.3 }}>{item.title}</div>
-                      
-                      <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-                        {item.status === "draft" && <button onClick={() => advanceStatus(item, "optimized")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Optimize with AI</button>}
-                        {item.status === "optimized" && <button onClick={() => advanceStatus(item, "staged")} style={{ flex: 1, padding: "6px", background: "#2383E2", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Mark as Staged</button>}
-                        {item.status === "staged" && <button onClick={() => advanceStatus(item, "pending_approval")} style={{ flex: 1, padding: "6px", background: "#CB7F2C", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Request Review</button>}
-                        {item.status === "pending_approval" && <button onClick={() => advanceStatus(item, "approved")} style={{ flex: 1, padding: "6px", background: "#4DAB9A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Approve</button>}
-                        {item.status === "approved" && <button onClick={() => advanceStatus(item, "published")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Publish</button>}
-                      </div>
-                    </div>
-                  ))}
-                  {items.length === 0 && <div style={{ textAlign: "center", color: "#9B9B9B", fontSize: 12, padding: "20px 0" }}>No items</div>}
-                </div>
+      <div style={{ display: "flex", gap: 20, overflowX: "auto", paddingBottom: 20, flex: 1 }}>
+        {COLUMNS.map(col => {
+          const items = contentItems.filter(i => i.status === col.id);
+          return (
+            <div key={col.id} style={{ flex: "0 0 320px", background: "#F7F7F5", borderRadius: 12, padding: 16, border: "1px solid #E3E3E0", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                {col.label}
+                <span style={{ color: "#9B9B9B", background: "#EBEBEA", padding: "2px 8px", borderRadius: 10, fontSize: 11 }}>{items.length}</span>
               </div>
-            );
-          })}
-        </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1 }}>
+                {items.map(item => (
+                  <div key={item.id} className="glass" style={{ background: "#FFFFFF", padding: 16, borderRadius: 8, border: "1px solid #E3E3E0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", cursor: "pointer" }} onClick={() => { setEditingItem(item); setModalOpen(true); }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: "#6B6B6B", textTransform: "uppercase" }}>{item.type}</span>
+                      {item.scheduledDate && <span style={{ fontSize: 10, color: "#4DAB9A", background: "#EAF5F2", padding: "2px 6px", borderRadius: 4 }}>{new Date(item.scheduledDate).toLocaleDateString()}</span>}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, lineHeight: 1.3 }}>{item.title}</div>
+                    
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                      {item.status === "draft" && <button onClick={() => advanceStatus(item, "optimized")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Optimize with AI</button>}
+                      {item.status === "optimized" && <button onClick={() => advanceStatus(item, "staged")} style={{ flex: 1, padding: "6px", background: "#2383E2", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Mark as Staged</button>}
+                      {item.status === "staged" && <button onClick={() => advanceStatus(item, "pending_approval")} style={{ flex: 1, padding: "6px", background: "#CB7F2C", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Request Review</button>}
+                      {item.status === "pending_approval" && <button onClick={() => advanceStatus(item, "approved")} style={{ flex: 1, padding: "6px", background: "#4DAB9A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Approve</button>}
+                      {item.status === "approved" && <button onClick={() => advanceStatus(item, "published")} style={{ flex: 1, padding: "6px", background: "#1A1A1A", color: "#FFF", border: "none", borderRadius: 6, fontSize: 11, cursor: "pointer" }}>Publish</button>}
+                    </div>
+                  </div>
+                ))}
+                {items.length === 0 && <div style={{ textAlign: "center", color: "#9B9B9B", fontSize: 12, padding: "20px 0" }}>No items</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
         
         {/* Editor Modal */}
         {modalOpen && editingItem && (

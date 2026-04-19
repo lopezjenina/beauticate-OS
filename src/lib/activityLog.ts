@@ -16,13 +16,13 @@ let activityLog: ActivityEntry[] = [];
 export function logActivity(entry: Omit<ActivityEntry, "id" | "timestamp">) {
   const newEntry = {
     ...entry,
-    id: `log-${crypto.randomUUID()}`,
+    id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
   };
   activityLog = [newEntry, ...activityLog].slice(0, 200); // Keep last 200 entries
   
   // Persist to DB in the background
-  logActivityToDb(entry).catch((err) => console.error("Failed to log activity:", err));
+  logActivityToDb(newEntry).catch((err) => console.error("Failed to log activity:", err));
 }
 
 export function getActivityLog(): ActivityEntry[] {

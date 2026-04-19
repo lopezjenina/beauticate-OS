@@ -88,7 +88,7 @@ export function Sidebar({
     ? filteredNav 
     : filteredNav.filter(item => item.id !== "editors");
 
-  const navItems = isSuperAdmin(userName, users)
+  const navItems = userRole === "superadmin"
     ? [...finalNav, { id: "users", label: "Users", group: "admin" }]
     : finalNav;
 

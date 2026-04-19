@@ -115,8 +115,8 @@ export default function App() {
   }, [user]);
 
   /* ─── Admin check ─── */
-  const canDelete = user ? isAdmin(user.name, users) : false;
-  const isSuperAdminUser = user ? isSuperAdmin(user.name, users) : false;
+  const canDelete = user ? ["admin", "superadmin"].includes(user.role) : false;
+  const isSuperAdminUser = user ? user.role === "superadmin" : false;
 
   /* ─── Sign out handler ─── */
   const handleSignOut = useCallback(async () => {

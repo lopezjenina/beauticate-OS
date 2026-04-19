@@ -9,7 +9,6 @@ export async function proxy(request: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
             cookieOptions: {
-                name: "beauticate-auth-token",
                 path: "/",
                 sameSite: "lax",
                 secure: process.env.NODE_ENV === "production",

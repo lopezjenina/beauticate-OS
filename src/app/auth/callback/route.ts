@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookieOptions: {
-        name: "beauticate-auth-token",
         path: "/",
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
@@ -49,7 +48,11 @@ export async function GET(request: NextRequest) {
   }
 
   // Log the real error so it shows up in Next.js server logs
-  console.error('[auth/callback] exchangeCodeForSession failed:', error.message, '| code:', error.code);
+  console.error('[auth/callback] exchangeCodeForSession failed:', {
+    message: error.message,
+    code: error.code,
+    status: error.status,
+  });
 
   // Pass the actual error code to the error page for a helpful message
   const errorCode = error.code ?? error.status?.toString() ?? 'unknown';

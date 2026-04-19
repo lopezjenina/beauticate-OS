@@ -1,22 +1,8 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
-
+import { generateContent } from '@/lib/gemini';
 
 export async function POST(request: Request) {
   try {
-    const envKeys = Object.keys(process.env).filter(k => k.includes('GEMINI') || k.includes('GOOGLE'));
-    console.log('Available AI Env Keys:', envKeys);
-
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'GEMINI_API_KEY is not configured' }, { status: 500 });
-    }
-
-    const ai = new GoogleGenAI({ 
-      apiKey: apiKey,
-      vertexai: false 
-    });
-
     const body = await request.json();
     const { prompt, model, contentItem } = body;
 
@@ -31,12 +17,9 @@ export async function POST(request: Request) {
       finalPrompt = buildOptimizationPrompt(contentItem);
     }
 
-    const response = await ai.models.generateContent({
-      model: model || 'gemini-3-flash-preview',
-      contents: finalPrompt,
-    });
+    const result = await generateContent(finalPrompt, model);
 
-    return NextResponse.json({ result: response.text });
+    return NextResponse.json({ result: result });
   } catch (error: any) {
     console.error('API Error:', error);
     return NextResponse.json(

@@ -1,38 +1,38 @@
-import { GoogleGenAI } from '@google/genai';
-
 /**
- * Server-side Gemini AI client helper.
- * This is a lazy-loading wrapper to ensure environment variables are available
- * and to prevent "Could not load default credentials" errors during module load.
+ * Server-side OpenRouter client helper.
+ * Provides access to Llama 3 and other premium models via a unified API.
  */
-function getAiClient() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+export async function generateContent(prompt: string, model: string = 'meta-llama/llama-3.1-70b-instruct') {
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is not configured');
+    // Fallback to Gemini if OpenRouter key is missing, or throw error
+    throw new Error('OPENROUTER_API_KEY is not configured in .env.local');
   }
-  return new GoogleGenAI({ 
-    apiKey, 
-    vertexai: false 
-  });
-}
 
-/**
- * Utility function to generate content using Gemini
- * @param prompt The text prompt to send to the model
- * @param model The model to use, defaults to gemini-3-flash-preview
- * @returns The generated text
- */
-export async function generateContent(prompt: string, model: string = 'gemini-3-flash-preview') {
   try {
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://beauticate-agency-os.vercel.app", // Updated site URL
+        "X-Title": "Beauticate OS", // Updated site name
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
 
-    return response.text;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || `OpenRouter error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
   } catch (error) {
-    console.error('Error generating content with Gemini:', error);
+    console.error('Error generating content with OpenRouter:', error);
     throw error;
   }
 }

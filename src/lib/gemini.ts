@@ -19,10 +19,10 @@ function getAiClient() {
 /**
  * Utility function to generate content using Gemini
  * @param prompt The text prompt to send to the model
- * @param model The model to use, defaults to gemini-1.5-flash
+ * @param model The model to use, defaults to gemini-3-flash-preview
  * @returns The generated text
  */
-export async function generateContent(prompt: string, model: string = 'gemini-1.5-flash') {
+export async function generateContent(prompt: string, model: string = 'gemini-3-flash-preview') {
   try {
     const ai = getAiClient();
     const response = await ai.models.generateContent({

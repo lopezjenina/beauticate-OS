@@ -150,7 +150,7 @@ function ContentCard({
           </div>
         ) : (
           <div style={{ fontSize: 12, color: "#8E8E8C", fontStyle: "italic", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {item.rawDraft.slice(0, 100)}...
+            {(item.rawDraft || "").slice(0, 100)}...
           </div>
         )}
       </div>

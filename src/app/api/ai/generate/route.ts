@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 function buildOptimizationPrompt(item: {
   title: string;
   type: string;
-  rawDraft: string;
+  rawDraft?: string;
   links?: string;
   notes?: string;
 }): string {
@@ -236,5 +236,5 @@ ${item.links ? `\nREFERENCE LINKS:\n${item.links}` : ''}
 ${item.notes ? `\nADDITIONAL NOTES FROM CREATOR:\n${item.notes}` : ''}
 
 🧾 ARTICLE
-${item.rawDraft}`;
+${item.rawDraft || ""}`;
 }

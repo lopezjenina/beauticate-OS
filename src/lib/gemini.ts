@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 /**
  * Server-side Gemini client helper.
- * Provides access to Google's Gemini models for content optimization.
+ * Provides access to Google's Gemini models for content optimization using the new unified SDK.
  */
 export async function generateContent(prompt: string, modelName: string = 'gemini-1.5-pro') {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -12,19 +12,17 @@ export async function generateContent(prompt: string, modelName: string = 'gemin
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const ai = new GoogleGenAI({ apiKey });
     
     // Default to gemini-1.5-pro for complex optimization tasks
-    // If the passed model name looks like an OpenRouter model (has /), we might want to handle it,
-    // but here we align with the file name and use the native SDK.
     const modelId = modelName.includes('/') ? 'gemini-1.5-pro' : modelName; 
-    const model = genAI.getGenerativeModel({ model: modelId });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
     
-    return text || "";
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: prompt,
+    });
+    
+    return response.text || "";
   } catch (error: any) {
     console.error('Error generating content with Gemini:', error);
     

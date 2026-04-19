@@ -25,7 +25,7 @@ import { logActivity } from "@/lib/activityLog";
 import {
   fetchClients, fetchVideos, fetchLeads, fetchOnboarding, fetchAds, fetchUsers,
   upsertClient, upsertVideo, upsertLead, upsertOnboarding, upsertAd,
-  deleteOnboarding, deleteVideo, logActivityToDb,
+  deleteOnboarding, deleteVideo,
 } from "@/lib/db";
 import { isAdmin, isSuperAdmin, signOut as supabaseSignOut, onAuthStateChange } from "@/lib/auth";
 import { ToastContainer, CelebrationModal, showToast } from "@/components/ui";
@@ -151,7 +151,6 @@ export default function App() {
     upsertLead(updatedLead);
     if (user) {
       logActivity({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
-      logActivityToDb({ user: user.name, action: "moved", entity: "lead", entityName: lead.company, details: "Closed Won → Onboarding" });
     }
     setCelebration({ title: "New Deal Closed!", message: `Congratulations! ${lead.company} is now a client. Time to start onboarding!` });
   }, [user]);
@@ -192,7 +191,6 @@ export default function App() {
     deleteOnboarding(ob.id);
     if (user) {
       logActivity({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
-      logActivityToDb({ user: user.name, action: "moved", entity: "onboarding", entityName: ob.name, details: `Moved to Production (Week ${assignedWeek})` });
     }
     setCelebration({ title: `${ob.name} is Live!`, message: `${ob.name} has moved to production in Week ${assignedWeek}. Let's create amazing content!` });
   }, [clients, user]);

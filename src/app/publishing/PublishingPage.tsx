@@ -5,6 +5,7 @@ import { PageHeader, Btn, showToast } from "@/components/ui";
 import { logActivity } from "@/lib/activityLog";
 import { fetchContent, upsertContent, deleteContent } from "@/lib/db";
 import { ContentPipeline } from "@/lib/types";
+import { parseOptimizedContent } from "@/lib/wordpress";
 
 /* ─── KANBAN CONFIG ─── */
 const COLUMNS: { id: ContentPipeline["status"]; label: string; color: string; icon: string }[] = [
@@ -206,6 +207,7 @@ export default function PublishingPage({ userName }: { userName?: string }) {
   const [viewItem, setViewItem] = useState<ContentPipeline | null>(null);
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploadingWP, setIsUploadingWP] = useState(false);
 
   const [form, setForm] = useState({ title: "", content: "", type: "Blog Post", links: "", notes: "" });
 
@@ -258,6 +260,41 @@ export default function PublishingPage({ userName }: { userName?: string }) {
       showToast(err.message, "error");
     } finally {
       setOptimizingId(null);
+    }
+  };
+
+  const handleUploadToWP = async (item: ContentPipeline) => {
+    if (!item.optimizedContent) return showToast("Content must be optimized first", "error");
+    
+    setIsUploadingWP(true);
+    try {
+      const wpData = parseOptimizedContent(item.optimizedContent, item.title);
+      
+      const res = await fetch("/api/wordpress/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(wpData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Upload failed");
+      }
+
+      const { postId, url } = await res.json();
+      
+      const updated = { ...item, wpPostId: postId, wpUrl: url, status: "scheduled" as const };
+      
+      setContentItems(prev => prev.map(i => i.id === item.id ? updated : i));
+      if (viewItem?.id === item.id) setViewItem(updated);
+      
+      await upsertContent(updated);
+      showToast("Uploaded as Draft to WordPress!", "success");
+      logActivity({ user: userName || "Unknown", action: "published", entity: "document", entityName: item.title, details: `Uploaded as Draft to WP (ID: ${postId})` });
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setIsUploadingWP(false);
     }
   };
 
@@ -410,7 +447,9 @@ export default function PublishingPage({ userName }: { userName?: string }) {
                   <>
                     <Btn variant="ghost" onClick={() => setIsEditing(true)}>Edit Content</Btn>
                     {viewItem.status === "draft" && <Btn variant="primary" onClick={() => handleOptimize(viewItem)} disabled={optimizingId === viewItem.id}>{optimizingId === viewItem.id ? "Optimizing..." : "✨ Run AI Optimization"}</Btn>}
+                    {viewItem.status === "approved" && <Btn variant="primary" onClick={() => handleUploadToWP(viewItem)} disabled={isUploadingWP}>{isUploadingWP ? "Uploading..." : "📤 Send to WordPress (Draft)"}</Btn>}
                     {viewItem.status === "review" && <Btn variant="primary" onClick={() => moveStatus(viewItem, "approved")}>Approve & Ready</Btn>}
+                    {viewItem.wpUrl && <a href={viewItem.wpUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}><Btn variant="ghost">View WP Draft ↗</Btn></a>}
                     <Btn variant="ghost" onClick={() => setViewItem(null)}>Close</Btn>
                   </>
                 )}

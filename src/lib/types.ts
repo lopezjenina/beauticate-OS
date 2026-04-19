@@ -138,7 +138,8 @@ export type ContentPipeline = {
   links?: string;
   notes?: string;
   createdBy?: string;
-  scheduledDate?: string;
+  wpPostId?: number;
+  wpUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 };

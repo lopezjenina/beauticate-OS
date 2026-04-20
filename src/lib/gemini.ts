@@ -35,10 +35,9 @@ export async function generateContent(prompt: string, modelName: string = 'gemin
       details: error.details,
     });
     
-    // If Gemini fails, we could fallback to OpenRouter if the key exists
     if (process.env.OPENROUTER_API_KEY) {
-      console.log('Gemini failed, trying OpenRouter fallback...');
-      return generateWithOpenRouter(prompt, 'meta-llama/llama-3.1-70b-instruct');
+      console.log('Gemini failed, trying OpenRouter fallback with free model...');
+      return generateWithOpenRouter(prompt, 'google/gemini-2.0-flash-exp:free');
     }
     
     throw error;

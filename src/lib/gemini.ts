@@ -12,19 +12,28 @@ export async function generateContent(prompt: string, modelName: string = 'gemin
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      apiVersion: 'v1'
+    });
     
-    // Default to gemini-1.5-pro for complex optimization tasks
-    const modelId = modelName.includes('/') ? 'gemini-1.5-pro' : modelName; 
+    // In stable v1, 'gemini-1.5-pro' is the correct model ID.
+    const modelId = modelName; 
     
+    console.log(`Generating content with Gemini model: ${modelId} (v1)`);
+
     const response = await ai.models.generateContent({
       model: modelId,
-      contents: prompt,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     
     return response.text || "";
   } catch (error: any) {
-    console.error('Error generating content with Gemini:', error);
+    console.error('Error generating content with Gemini:', {
+      message: error.message,
+      status: error.status,
+      details: error.details,
+    });
     
     // If Gemini fails, we could fallback to OpenRouter if the key exists
     if (process.env.OPENROUTER_API_KEY) {

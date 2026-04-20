@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
  * Server-side Gemini client helper.
  * Provides access to Google's Gemini models for content optimization using the new unified SDK.
  */
-export async function generateContent(prompt: string, modelName: string = 'gemini-1.5-pro') {
+export async function generateContent(prompt: string, modelName: string = 'gemini-1.5-flash') {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
@@ -17,7 +17,7 @@ export async function generateContent(prompt: string, modelName: string = 'gemin
       apiVersion: 'v1'
     });
     
-    // In stable v1, 'gemini-1.5-pro' is the correct model ID.
+    // In stable v1, 'gemini-1.5-flash' is a reliable default.
     const modelId = modelName; 
     
     console.log(`Generating content with Gemini model: ${modelId} (v1)`);
